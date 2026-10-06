@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 import { emitter } from "./ts-emit.mjs";
 
-const RELEASES = "https://github.com/Morelitea/initiative/releases/download";
+const RELEASES = "https://github.com/beyonders-studio/initiative/releases/download";
 const ASSET = "initiative-plugin-api.json";
 const SERVER = "/api/v1/c/0";
 const METHODS = ["get", "put", "post", "delete", "patch"];

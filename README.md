@@ -1,6 +1,6 @@
 # initiative-plugin-sdk
 
-Build a plug-in for [Initiative](https://github.com/Morelitea/initiative): a
+Build a plug-in for [Initiative](https://github.com/beyonders-studio/initiative): a
 service that reads and writes a community's content, answers Initiative's
 calls, and draws tiles on its dashboards.
 
