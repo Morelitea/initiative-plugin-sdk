@@ -161,10 +161,10 @@ describe("calls", () => {
     answers.set("GET /api/v1/c/0/projects/", () => json(200, []));
     const client = initiative().asInstallation("gapp_1");
     await expect(client.request("GET", "/projects/", { scope: "projects:read" })).resolves.toEqual([]);
-    const error = (await client.request("GET", "/documents/", { scope: "documents:read" }).catch((caught) => caught)) as MissingScopeError;
+    const error = (await client.request("GET", "/files/", { scope: "files:read" }).catch((caught) => caught)) as MissingScopeError;
     expect(error).toBeInstanceOf(MissingScopeError);
-    expect(error.scope).toBe("documents:read");
-    expect(sent.filter((one) => one.url.includes("/documents/"))).toHaveLength(0);
+    expect(error.scope).toBe("files:read");
+    expect(sent.filter((one) => one.url.includes("/files/"))).toHaveLength(0);
   });
 
   it("sends a call answered 401 once more, on a fresh token", async () => {
@@ -235,7 +235,7 @@ describe("the plug-in API", () => {
   it("checks the scope an operation names, before sending", async () => {
     const error = await initiative().asInstallation("gapp_1").api.listDocuments().catch((caught) => caught);
     expect(error).toBeInstanceOf(MissingScopeError);
-    expect(error.scope).toBe("documents:read");
+    expect(error.scope).toBe("files:read");
     expect(routes()).toEqual([]);
   });
 
@@ -245,7 +245,7 @@ describe("the plug-in API", () => {
     await api.archiveEntity({ path: { entity_type: "task", entity_id: 3 } });
     const error = await api.archiveEntity({ path: { entity_type: "document", entity_id: 3 } }).catch((caught) => caught);
     expect(error).toBeInstanceOf(MissingScopeError);
-    expect(error.scope).toBe("documents:write");
+    expect(error.scope).toBe("files:write");
     await expect(api.archiveEntity({ path: { entity_type: "widget" as never, entity_id: 3 } })).rejects.toThrow(
       "entity_type is one of"
     );

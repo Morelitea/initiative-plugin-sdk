@@ -648,7 +648,7 @@ npm run generate:plugin-api -- --url https://initiative.example.com
 | Scope | Grants |
 |---|---|
 | `projects:read`, `projects:write` | Projects and what belongs to them: tasks, statuses, checklists. |
-| `documents:read`, `documents:write` | Documents. |
+| `files:read`, `files:write` | Files: text documents, whiteboards, spreadsheets, links and uploads. |
 | `queues:read`, `queues:write` | Queues, their items and commands. |
 | `counter_groups:read`, `counter_groups:write` | Counter groups, their counters and commands. |
 | `calendars:read`, `calendars:write` | Calendars, events and attendees. |
