@@ -659,6 +659,7 @@ npm run generate:plugin-api -- --url https://initiative.example.com
 | `comments:read`, `comments:write` | Comments on what the plug-in can read. |
 | `relationships:read`, `relationships:write` | Links between items the plug-in can reach. |
 | `tags:read`, `tags:write` | Reading, creating and applying tags. |
+| `properties:read`, `properties:write` | Reading an initiative's custom property definitions and their options, and creating, changing and removing them. Setting a value on an item takes that item's own scope instead: a task's with `projects:write`. |
 | `sharing:read`, `sharing:write` | Seeing who has access to something, and changing it where the plug-in's own access allows it. |
 | `members:read` | The roster, as references, display names and avatars. |
 | `initiatives:read` | The initiatives the plug-in is placed in. |
