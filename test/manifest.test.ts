@@ -860,6 +860,26 @@ describe("minimum_age", () => {
   });
 });
 
+describe("min_plugin_api", () => {
+  const needing = (min_plugin_api: unknown): Manifest => ({ ...base(), min_plugin_api } as Manifest);
+
+  it("accepts a contract version as MAJOR.MINOR", () => {
+    expect(validateManifest(needing("4.1"))).toEqual([]);
+    expect(validateManifest(needing("10.0"))).toEqual([]);
+  });
+
+  it("is optional", () => {
+    expect(validateManifest(base())).toEqual([]);
+  });
+
+  it("refuses anything but MAJOR.MINOR", () => {
+    for (const wrong of ["4", "4.1.1", "v4.1", "4.x", "4.1-beta", " 4.1", "4.1\n", "", 4.1]) {
+      const problems = validateManifest(needing(wrong));
+      expect(problems.map((problem) => problem.where), JSON.stringify(wrong)).toContain("/min_plugin_api");
+    }
+  });
+});
+
 describe("the scopes a plug-in asks for", () => {
   const asking = (scopes: unknown) =>
     validateManifest({ ...base(), service: { public_id: "acme.tracker", scopes } } as never);

@@ -1,6 +1,7 @@
 /**
  * `initiative-plugin-sdk/manifest`: the contract as types, the plug-in's one
- * definition, and checking a manifest before a deployment does.
+ * definition, checking a manifest before a deployment does, and the rule for
+ * which plug-in API contract a manifest's `min_plugin_api` runs on.
  */
 
 export * from "./contract.js";
@@ -45,5 +46,7 @@ export {
   type PluginDocument,
   type ValidationProblem,
 } from "./validate.js";
+
+export { pluginApiCompatible } from "./plugin-api.js";
 
 export type { Jwks, PublicJwk } from "./keys.js";

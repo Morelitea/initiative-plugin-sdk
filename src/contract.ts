@@ -219,7 +219,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
 } as const;
 
 export type Identifier = string;
@@ -1311,6 +1311,16 @@ export interface Manifest {
    * each from 13 to 21.
    */
   minimum_age?: Record<string, number>;
+  /**
+   * The oldest plug-in API contract this plug-in needs, as 'MAJOR.MINOR':
+   * '4.1'. The contract is the plug-in API published with
+   * initiative-plugin-sdk, versioned as that package is. A deployment serving
+   * contract S can run it when S has the same major version and a minor version
+   * at least this one's. Absent: any contract; the plug-in makes no claim.
+   * Beside a listing's min_app_version, the oldest Initiative release it runs
+   * on, this says what the plug-in calls rather than which release serves it.
+   */
+  min_plugin_api?: string;
   /**
    * Declarative plug-ins, which must name at least one: every host their
    * requests, paging and links may reach. A container plug-in names none.

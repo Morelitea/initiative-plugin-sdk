@@ -1,10 +1,19 @@
 #!/usr/bin/env node
 /**
- * Generate the typed client for Initiative's plug-in API.
+ * Publish Initiative's plug-in API, and generate the typed client from it.
  *
  * Initiative describes every route an installed plug-in may call in its own
- * OpenAPI document. This reads that document straight from Initiative and
- * writes `src/plugin-api.generated.ts`, nothing else:
+ * OpenAPI document. This SDK publishes that document as the plug-in API
+ * contract, `schemas/plugin-api.json`, at its own version: `info.version` is
+ * the package's version, and `info["x-initiative-source"]` names the Initiative
+ * release and commit it was taken from. Every plug-in, in any language,
+ * generates its client from that file; Initiative holds itself to it.
+ *
+ * Taking the document from Initiative (`--checkout`, `--release`, `--url`)
+ * writes `schemas/plugin-api.json` and then the client. With no source, the
+ * client is generated from `schemas/plugin-api.json` alone, never from
+ * Initiative, and the file's `info.version` follows the package's version.
+ * The client, `src/plugin-api.generated.ts`, is:
  *
  * - `PluginApiSchemas`, every schema the operations reach, and
  *   `PluginApiOperations`, each operation's arguments by where they go and its
@@ -14,28 +23,33 @@
  *   `json` naming the query parameters sent as JSON) and the `PluginApi`
  *   methods `client.api` exposes.
  *
- * The document itself is never stored; the generated file's header names the
- * Initiative it came from. Regenerate when Initiative releases.
+ * Take the document again when Initiative's plug-in API grows.
  *
  *   node scripts/generate-plugin-api.mjs --checkout ../initiative   # a local checkout (uv)
  *   node scripts/generate-plugin-api.mjs --release v0.75.0          # a release's attached asset
  *   node scripts/generate-plugin-api.mjs --url https://initiative.example.com
+ *   node scripts/generate-plugin-api.mjs                            # the client from schemas/plugin-api.json
+ *   node scripts/generate-plugin-api.mjs --check                    # exit non-zero if either is stale
  */
 
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { emitter } from "./ts-emit.mjs";
 
-const RELEASES = "https://github.com/beyonders-studio/initiative/releases/download";
+const REPOSITORY = "https://github.com/beyonders-studio/initiative";
+const RELEASES = `${REPOSITORY}/releases/download`;
 const ASSET = "initiative-plugin-api.json";
 const SERVER = "/api/v1/c/0";
 const METHODS = ["get", "put", "post", "delete", "patch"];
+const SOURCE = "x-initiative-source";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const published = join(root, "schemas", "plugin-api.json");
 const output = join(root, "src", "plugin-api.generated.ts");
+const contractVersion = JSON.parse(readFileSync(join(root, "package.json"), "utf-8")).version;
 
 function fail(message) {
   console.error(message);
@@ -55,28 +69,68 @@ async function download(url) {
   return response.text();
 }
 
-/** The document and where it came from. */
+/** A release tag's commit, the tag's own when it is annotated. */
+function tagCommit(tag) {
+  const lines = run("git", ["ls-remote", "--tags", `${REPOSITORY}.git`, `refs/tags/${tag}`, `refs/tags/${tag}^{}`])
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.split("\t"));
+  const commit = (lines.find(([, ref]) => ref.endsWith("^{}")) ?? lines[0])?.[0];
+  if (!commit) fail(`${REPOSITORY} has no tag ${tag}`);
+  return commit;
+}
+
+/**
+ * Initiative's document, and where it came from: the Initiative version and,
+ * where it can be known, the commit.
+ */
 async function source(argv) {
   const [flag, value, ...rest] = argv;
-  if (!value || rest.length) fail("usage: generate-plugin-api.mjs --checkout <path> | --release <vX.Y.Z> | --url <base>");
+  if (!value || rest.length) {
+    fail("usage: generate-plugin-api.mjs [--checkout <path> | --release <vX.Y.Z> | --url <base> | --check]");
+  }
   if (flag === "--checkout") {
     const checkout = resolve(value);
     const text = run("uv", ["run", "python", "scripts/export_openapi.py", "--plugin", "-"], {
       cwd: join(checkout, "backend"),
       stdio: ["ignore", "pipe", "inherit"],
     });
-    const commit = run("git", ["-C", checkout, "rev-parse", "--short", "HEAD"]).trim();
-    const dirty = run("git", ["-C", checkout, "status", "--porcelain"]).trim() ? ", with uncommitted changes" : "";
-    return { text, from: `a checkout at ${commit}${dirty}` };
+    let version;
+    try {
+      version = readFileSync(join(checkout, "VERSION"), "utf-8").trim();
+    } catch {
+      fail(`${checkout} has no VERSION file: is it an Initiative checkout?`);
+    }
+    const commit = run("git", ["-C", checkout, "rev-parse", "HEAD"]).trim();
+    const dirty = run("git", ["-C", checkout, "status", "--porcelain"]).trim() !== "";
+    return { text, initiative: { version, commit, ...(dirty ? { uncommitted_changes: true } : {}) } };
   }
   if (flag === "--release") {
-    return { text: await download(`${RELEASES}/${encodeURIComponent(value)}/${ASSET}`), from: `release ${value}` };
+    const text = await download(`${RELEASES}/${encodeURIComponent(value)}/${ASSET}`);
+    return { text, initiative: { version: value.replace(/^v/, ""), release: value, commit: tagCommit(value) } };
   }
   if (flag === "--url") {
     const base = value.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
-    return { text: await download(`${base}/api/v1/plugin-platform/openapi.json`), from: base };
+    const text = await download(`${base}/api/v1/plugin-platform/openapi.json`);
+    let version;
+    try {
+      ({ version } = JSON.parse(await download(`${base}/api/v1/version`)));
+    } catch {
+      fail(`${base}/api/v1/version did not answer Initiative's version`);
+    }
+    if (typeof version !== "string") fail(`${base}/api/v1/version did not answer Initiative's version`);
+    return { text, initiative: { version, url: base } };
   }
   fail(`unknown source ${flag}: use --checkout, --release or --url`);
+}
+
+/** Where the published document came from, as the client's header says it. */
+function provenance(initiative) {
+  const where = initiative.commit
+    ? `commit ${initiative.commit.slice(0, 9)}${initiative.uncommitted_changes ? ", with uncommitted changes" : ""}`
+    : `served at ${initiative.url}`;
+  return `Initiative ${initiative.version} (${where})`;
 }
 
 const SCHEMAS = "#/components/schemas/";
@@ -258,23 +312,75 @@ export interface PluginApiArgs {
 }
 `;
 
-const { text, from } = await source(process.argv.slice(2));
-let spec;
-try {
-  spec = JSON.parse(text);
-} catch {
-  fail(`the plug-in API document from ${from} is not JSON`);
-}
-if (spec.servers?.[0]?.url !== SERVER) fail(`expected the plug-in API's server to be ${SERVER}, not ${spec.servers?.[0]?.url}`);
-
-writeFileSync(
-  output,
-  `/**
- * Generated by scripts/generate-plugin-api.mjs from Initiative ${spec.info.version}'s plug-in API
- * (${from}). Do not edit: regenerate.
+/** The client's text, from the published document. */
+function client(spec) {
+  return `/**
+ * Generated by scripts/generate-plugin-api.mjs from schemas/plugin-api.json, the plug-in API
+ * taken from ${provenance(spec.info[SOURCE])}. Do not edit: regenerate.
  */
 
 ${PREAMBLE}
-${emit(spec)}`
-);
-console.log(`wrote ${output} from Initiative ${spec.info.version} (${from})`);
+${emit(spec)}`;
+}
+
+/** The document at the contract's version, its keys in Initiative's order. */
+function stamped(spec, initiative) {
+  return { ...spec, info: { ...spec.info, version: contractVersion, [SOURCE]: initiative } };
+}
+
+const argv = process.argv.slice(2);
+const checking = argv.length === 1 && argv[0] === "--check";
+let spec;
+if (argv.length && !checking) {
+  const { text, initiative } = await source(argv);
+  let taken;
+  try {
+    taken = JSON.parse(text);
+  } catch {
+    fail(`the plug-in API document from ${provenance(initiative)} is not JSON`);
+  }
+  if (taken.servers?.[0]?.url !== SERVER) fail(`expected the plug-in API's server to be ${SERVER}, not ${taken.servers?.[0]?.url}`);
+  spec = stamped(taken, initiative);
+} else {
+  let text;
+  try {
+    text = readFileSync(published, "utf-8");
+  } catch {
+    fail(`${published} is missing: take it from Initiative with --checkout, --release or --url`);
+  }
+  let current;
+  try {
+    current = JSON.parse(text);
+  } catch {
+    fail(`${published} is not JSON: take it again`);
+  }
+  if (!current.info?.[SOURCE]?.version) fail(`${published} names no Initiative in info["${SOURCE}"]: take it again`);
+  spec = stamped(current, current.info[SOURCE]);
+}
+
+// The client is emitted first: a document it cannot be generated from is not published.
+const generated = client(spec);
+const outputs = [
+  [published, `${JSON.stringify(spec, null, 2)}\n`],
+  [output, generated],
+];
+let stale = false;
+for (const [path, body] of outputs) {
+  let current = null;
+  try {
+    current = readFileSync(path, "utf-8");
+  } catch {
+    /* not written yet */
+  }
+  if (current === body) continue;
+  if (checking) {
+    process.stderr.write(`${path} is out of date — run 'npm run generate:plugin-api'\n`);
+    stale = true;
+  } else {
+    writeFileSync(path, body, "utf-8");
+    process.stdout.write(`wrote ${path}\n`);
+  }
+}
+if (stale) process.exit(1);
+if (checking) process.stdout.write(`the plug-in API ${contractVersion} and its client are current\n`);
+else console.log(`plug-in API ${contractVersion}, from ${provenance(spec.info[SOURCE])}`);

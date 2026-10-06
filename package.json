@@ -46,6 +46,7 @@
       "default": "./dist/testing.js"
     },
     "./schemas/plugin-manifest.json": "./schemas/plugin-manifest.json",
+    "./plugin-api.json": "./schemas/plugin-api.json",
     "./manifest.contract.json": "./manifest.contract.json"
   },
   "bin": {
@@ -68,7 +69,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "generate": "node scripts/generate.mjs",
-    "check:generated": "node scripts/generate.mjs --check",
+    "check:generated": "node scripts/generate.mjs --check && node scripts/generate-plugin-api.mjs --check",
     "generate:plugin-api": "node scripts/generate-plugin-api.mjs"
   },
   "dependencies": {

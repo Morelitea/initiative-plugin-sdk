@@ -10,11 +10,12 @@ holds its tokens, and builds its manifest.
 
 | Import | Holds |
 |---|---|
-| `initiative-plugin-sdk/manifest` | `definePlugin`, `defineEndpoint`, the contract's types, `validateManifest` |
+| `initiative-plugin-sdk/manifest` | `definePlugin`, `defineEndpoint`, the contract's types, `validateManifest`, `pluginApiCompatible` |
 | `initiative-plugin-sdk/server` | `createPlugin`, `serve`, `EndpointError` |
 | `initiative-plugin-sdk/client` | `Initiative` and the `Client` it gives, acting as the community or a member; plug-in keys |
 | `initiative-plugin-sdk/widget` | What a widget is handed, and the scenes it returns |
 | `initiative-plugin-sdk/testing` | A declarative plug-in's requests and maps, run against recorded vendor answers |
+| `initiative-plugin-sdk/plugin-api.json` | The plug-in API contract: the OpenAPI document of every route a plug-in may call |
 | bin `initiative-plugin` | `init`, `build`, `pack`, `dev`, `validate`, `keygen`, `uid`, `schema` |
 
 Node 20 or later. Two runtime dependencies, `ajv` and `jsonata`; everything
@@ -368,10 +369,10 @@ for (const { installation, active } of await initiative.installations()) {
   `files:write`), or, where Initiative checks each item, at least one of
   them. `MissingScopeError` names the scope instead. Writing implies reading.
 
-  `client.api` follows Initiative's plug-in API: when Initiative renames or moves a
-  route, the method changes with it in the SDK release built from that
-  Initiative release, without a major version. The rest of the SDK follows
-  semantic versioning.
+  `client.api` is generated from the plug-in API contract this SDK publishes
+  ([The plug-in API contract](#the-plug-in-api-contract)), so it changes as
+  the contract does: a minor release adds routes and fields, and only a major
+  release removes or changes one.
   `PluginApiSchemas["TaskRead"]` names a schema's type.
 - `client.request(method, path, { scope, body })` calls a community route (the
   path after `/c/{community}`) by hand, with the same scope check.
@@ -425,6 +426,19 @@ placeholders Initiative fills: `${IMAGE}` (`image`, pinned by its digest) and
 the build, so a misspelt placeholder cannot ship. `baseUrl` is where the
 service answers on the Compose network, an http or https URL of at most 512
 characters; Initiative pre-fills the deployment's base URL with it.
+
+`minAppVersion` is the oldest Initiative release a version runs on. Beside it,
+the definition's `minPluginApi` (the manifest's `min_plugin_api`) is the
+oldest [plug-in API contract](#the-plug-in-api-contract) the plug-in calls, as
+`"MAJOR.MINOR"`: the SDK version its `client.api` was written against.
+
+```ts
+definePlugin({ publicId: "acme.tracker", /* … */ minPluginApi: "4.1" });
+```
+
+A deployment serving contract `4.3.2` runs it; one serving `4.0.5` or `5.0.0`
+does not. Leave it out and the plug-in makes no claim: it is offered on any
+contract, as listings written before the field were.
 
 ```sh
 npx initiative-plugin build --registry ../registry/sources
@@ -642,16 +656,56 @@ may say. `schemas/plugin-manifest.json` and `src/contract.ts` (its types) are
 generated from it with `npm run generate`; `npm run check:generated` fails when
 either is stale. Initiative vendors the contract from this repository's tags.
 
-`src/plugin-api.generated.ts`, behind `client.api`, is generated from Initiative's
-plug-in API description, read from Initiative itself and not stored here. Its
-header names the Initiative it came from. Regenerate it from a checkout, a
-release or a running deployment, with the same emitter as the contract's types:
+## The plug-in API contract
+
+A plug-in and Initiative release on their own schedules. What they share is
+one file this package publishes, `schemas/plugin-api.json`, exported as
+`initiative-plugin-sdk/plugin-api.json`: the OpenAPI document of every route a
+plug-in may call, as Initiative describes it. A plug-in depends on an SDK
+version and nothing else.
+
+- **The contract version is this package's version.** The file's
+  `info.version` is the SDK's version, and `info["x-initiative-source"]` names
+  the Initiative release and commit the document was taken from. A minor
+  release adds operations, fields or optional parameters; removing or changing
+  anything is a major release.
+- **Every client comes from the file.** `src/plugin-api.generated.ts`, behind
+  `client.api`, is generated from `schemas/plugin-api.json`, never from
+  Initiative directly. A plug-in in another language generates its own client
+  from the same file, at the SDK version it targets.
+- **A deployment serves the contract it vendors.** Initiative carries a copy of
+  this file from an SDK release, serves that SDK version as its plug-in API
+  version, and checks in its own CI that what it serves still holds every
+  route, parameter and response field the copy has. It may serve more.
+- **A plug-in names the oldest contract it needs**, as `min_plugin_api`
+  (`"MAJOR.MINOR"`) in its manifest. A deployment serving contract `S` runs a
+  plug-in needing `N` when they share a major version and `S`'s minor is at
+  least `N`'s. A manifest without the field runs on any contract.
+  Initiative, the registry and the SDK decide with the same rule, exported as
+  `pluginApiCompatible`:
+
+  ```ts
+  import { pluginApiCompatible } from "initiative-plugin-sdk/manifest";
+
+  pluginApiCompatible("4.3.2", "4.1"); // true
+  pluginApiCompatible("5.0.0", "4.1"); // false: another major
+  pluginApiCompatible("4.3.2", undefined); // true: no claim
+  ```
+
+The file is never edited by hand. Take it again when Initiative's plug-in API
+grows, from a checkout, a release or a running deployment; this rewrites the
+file at the package's version and then the client from it:
 
 ```sh
 npm run generate:plugin-api -- --checkout ../initiative   # runs its export with uv
 npm run generate:plugin-api -- --release v0.75.0
 npm run generate:plugin-api -- --url https://initiative.example.com
 ```
+
+With no source, `npm run generate:plugin-api` regenerates the client from the
+file and restamps its `info.version` with the package's; the Promote workflow
+does this when it bumps the version. `npm run check:generated` fails when
+either the file's version or the client is stale.
 
 ## Scopes
 
