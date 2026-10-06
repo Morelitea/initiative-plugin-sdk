@@ -149,6 +149,30 @@ describe("a minimum age", () => {
   });
 });
 
+describe("the oldest plug-in API it needs", () => {
+  it("is written as min_plugin_api, after the minimum age", () => {
+    const needing = manifestOf(
+      { ...plugin, minimumAge: { default: 16 }, minPluginApi: "4.1" },
+      { "open-count": "globalThis.render = function () {};" }
+    );
+    expect(needing.min_plugin_api).toBe("4.1");
+    expect(Object.keys(needing).indexOf("min_plugin_api")).toBe(Object.keys(needing).indexOf("minimum_age") + 1);
+    expect(validateManifest(needing)).toEqual([]);
+  });
+
+  it("is left out when the definition says nothing", () => {
+    expect("min_plugin_api" in manifest).toBe(false);
+  });
+
+  it("fails validation when it is not MAJOR.MINOR", () => {
+    const wrong = manifestOf(
+      { ...plugin, minPluginApi: "4.1.1" },
+      { "open-count": "globalThis.render = function () {};" }
+    );
+    expect(validateManifest(wrong).map((problem) => problem.where)).toContain("/min_plugin_api");
+  });
+});
+
 describe("a declarative definition", () => {
   const declarative = manifestOf(issuesPlugin());
 

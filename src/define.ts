@@ -341,6 +341,14 @@ export interface PluginDefinition<E, W> {
   name: string;
   /** How old somebody must be to use it, by ISO 3166-1 alpha-2 country, with `default` for the rest: `{ default: 16, US: 13 }`. */
   minimumAge?: Record<string, number>;
+  /**
+   * The oldest plug-in API contract the plug-in needs, as `"MAJOR.MINOR"`: the
+   * SDK version whose `client.api` it was written against, such as `"4.1"`. A
+   * deployment serving a contract of the same major version and at least this
+   * minor runs it (`pluginApiCompatible`). Absent: no claim. Beside
+   * `listing.minAppVersion`, the oldest Initiative release it runs on.
+   */
+  minPluginApi?: string;
   scopes?: Array<Scope | PluginScope>;
   /** A declarative plug-in's hosts: every host its requests may reach. Naming them makes the plug-in declarative. */
   hosts?: string[];
@@ -424,6 +432,7 @@ export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = 
     features: FEATURES.filter((feature) => present[feature] !== undefined),
     default_name: plugin.name,
     ...(plugin.minimumAge ? { minimum_age: { ...plugin.minimumAge } } : {}),
+    ...(plugin.minPluginApi !== undefined ? { min_plugin_api: plugin.minPluginApi } : {}),
     ...(plugin.hosts ? { hosts: [...plugin.hosts] } : {}),
     ...(plugin.auth ? { auth: plugin.auth } : {}),
     ...present,

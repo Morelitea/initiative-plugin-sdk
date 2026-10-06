@@ -12,8 +12,8 @@ usage() {
   cat <<USAGE
 Usage: $0 [--patch | --minor | --major] [--dry-run]
 
-Bumps the version in package.json and package-lock.json, moves the
-[Unreleased] block of CHANGELOG.md (if the repository keeps one) under a
+Bumps the version in package.json and package-lock.json, restamps
+schemas/plugin-api.json with it, moves the [Unreleased] block of CHANGELOG.md (if the repository keeps one) under a
 [X.Y.Z] heading, and opens a release pull request against main.
 USAGE
 }
@@ -93,6 +93,11 @@ fi
 
 npm version "$new" --no-git-tag-version --ignore-scripts >/dev/null
 files=(package.json package-lock.json)
+
+# The published plug-in API is versioned as the package is: its info.version
+# is the contract version, so it is restamped with the release.
+node scripts/generate-plugin-api.mjs >/dev/null
+files+=(schemas/plugin-api.json)
 
 if [[ -f CHANGELOG.md ]]; then
   if ! grep -q '^## \[Unreleased\]' CHANGELOG.md; then
