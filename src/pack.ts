@@ -19,15 +19,16 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { bundler, compile, registrationOf } from "./build.js";
+import { load, registrationOf, type ListedPlugin } from "./build.js";
 import type { Manifest } from "./contract.js";
-import type { AnyPlugin } from "./define.js";
 
 export interface PackOptions {
   /** The plug-in's package directory. */
   root: string;
   /** The module whose default export is the plug-in's definition, relative to `root`. */
   plugin: string;
+  /** A plug-in built outside TypeScript, in place of `plugin`: its `BuiltPlugin` file, relative to `root`. */
+  manifest?: string;
   /** Where to write the listing file, relative to `root`. Default: `<publicId>-<version>.json`. */
   out?: string;
 }
@@ -43,7 +44,7 @@ export interface Packed {
 }
 
 /** The listing file for a plug-in whose manifest `compile` made. */
-export function listingFile(plugin: AnyPlugin, manifest: Manifest, root: string): Packed {
+export function listingFile(plugin: ListedPlugin, manifest: Manifest, root: string): Packed {
   const listing = plugin.listing;
   if (!listing) throw new Error("pack needs the plug-in's listing: declare `listing` in its definition");
   const avatar = KEPT_PICTURES.test(listing.avatar) ? readFileSync(resolve(root, listing.avatar)) : null;
@@ -71,10 +72,9 @@ export function listingFile(plugin: AnyPlugin, manifest: Manifest, root: string)
 
 /** Write the plug-in's listing file. Answers the process's exit code. */
 export async function pack(options: PackOptions): Promise<number> {
-  const esbuild = await bundler("pack");
-  if (!esbuild) return 1;
   const root = resolve(options.root);
-  const compiled = await compile(esbuild, root, options.plugin);
+  const compiled = await load("pack", root, options);
+  if (!compiled) return 1;
   if (compiled.problems) {
     for (const problem of compiled.problems) process.stderr.write(`${problem}\n`);
     return 1;

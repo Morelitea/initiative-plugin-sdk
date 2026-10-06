@@ -15,6 +15,12 @@
  * With `--check` nothing is written, and any file that differs from what would
  * be written is a failure.
  *
+ * A plug-in built outside TypeScript gives `--manifest <file>` in place of its
+ * definition: a JSON file holding its manifest and its listing
+ * ({@link BuiltPlugin}). It is checked as a definition's manifest is, and its
+ * registry source is written from its listing, which states the version it
+ * lists; no `manifest.json` is written beside it.
+ *
  * Bundling uses esbuild, which the plug-in installs beside the SDK
  * (`npm install --save-dev esbuild`). Nothing at run time needs it.
  */
@@ -34,6 +40,8 @@ export interface BuildOptions {
   root: string;
   /** The module whose default export is the plug-in's definition, relative to `root`. */
   plugin: string;
+  /** A plug-in built outside TypeScript, in place of `plugin`: its {@link BuiltPlugin} file, relative to `root`. */
+  manifest?: string;
   /** Where registry sources live; the plug-in's is written under `<publisher>/<uid>/`. */
   registry?: string;
   check: boolean;
@@ -51,8 +59,54 @@ export async function bundler(command: string): Promise<Esbuild | null> {
   }
 }
 
+/**
+ * A plug-in whose manifest is built outside TypeScript, as `--manifest` reads
+ * it: what a definition names beside its manifest, and the manifest itself.
+ */
+export interface BuiltPlugin {
+  publicId: string;
+  uid: string;
+  name: string;
+  manifest: Manifest;
+  listing?: ListingDeclaration;
+}
+
+/** What the listing writers read of a plug-in: its definition, or a {@link BuiltPlugin}'s. */
+export type ListedPlugin = Pick<AnyPlugin, "publicId" | "uid" | "name" | "scopes" | "hosts" | "hooks" | "listing">;
+
 /** What a definition builds: the plug-in and its manifest, or every problem that stops it. */
-export type Compiled = { plugin: AnyPlugin; manifest: Manifest; problems?: never } | { problems: string[] };
+export type Compiled = { plugin: ListedPlugin; manifest: Manifest; problems?: never } | { problems: string[] };
+
+/**
+ * The plug-in `options` names, compiled: from its definition, or from the
+ * {@link BuiltPlugin} file `options.manifest` names. Null when its definition
+ * needs esbuild and it is not installed.
+ */
+export async function load(
+  command: string,
+  root: string,
+  options: { plugin: string; manifest?: string }
+): Promise<Compiled | null> {
+  if (options.manifest !== undefined) return compileBuilt(root, options.manifest);
+  const esbuild = await bundler(command);
+  return esbuild ? compile(esbuild, root, options.plugin) : null;
+}
+
+/** A {@link BuiltPlugin} file, checked as a definition's manifest is. */
+function compileBuilt(root: string, file: string): Compiled {
+  let built: BuiltPlugin;
+  try {
+    built = JSON.parse(readFileSync(resolve(root, file), "utf-8")) as BuiltPlugin;
+  } catch (error) {
+    return { problems: [`${file}: ${(error as Error).message}`] };
+  }
+  const missing = (["publicId", "uid", "name"] as const).filter((key) => typeof built[key] !== "string");
+  if (missing.length || typeof built.manifest !== "object" || built.manifest === null) {
+    return { problems: [`${file}: a built plug-in names its ${[...missing, "manifest"].join(", ")}`] };
+  }
+  const { manifest, ...named } = built;
+  return checked({ ...named, scopes: manifest.service?.scopes, hosts: manifest.hosts }, manifest, []);
+}
 
 /**
  * Load the plug-in's definition, bundle its widgets and check the manifest they
@@ -70,7 +124,11 @@ export async function compile(esbuild: Esbuild, root: string, entry: string): Pr
     }
     modules[id] = source;
   }
-  const manifest = manifestOf(plugin, modules);
+  return checked(plugin, manifestOf(plugin, modules), problems);
+}
+
+/** The plug-in and its manifest, or every problem with them beside `problems`. */
+function checked(plugin: ListedPlugin, manifest: Manifest, problems: string[]): Compiled {
   problems.push(
     ...validateManifest(manifest, { publicId: plugin.publicId }).map((problem) => `manifest${problem.where}: ${problem.message}`)
   );
@@ -81,10 +139,9 @@ export async function compile(esbuild: Esbuild, root: string, entry: string): Pr
 
 /** Build, or check, the plug-in's files. Answers the process's exit code. */
 export async function build(options: BuildOptions): Promise<number> {
-  const esbuild = await bundler("build");
-  if (!esbuild) return 1;
   const root = resolve(options.root);
-  const compiled = await compile(esbuild, root, options.plugin);
+  const compiled = await load("build", root, options);
+  if (!compiled) return 1;
   if (compiled.problems) {
     for (const problem of compiled.problems) process.stderr.write(`${problem}\n`);
     return 1;
@@ -92,14 +149,18 @@ export async function build(options: BuildOptions): Promise<number> {
   const { plugin, manifest } = compiled;
 
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
-  const outputs: Array<[string, string | Buffer]> = [[join(root, "manifest.json"), manifestText]];
+  const outputs: Array<[string, string | Buffer]> =
+    options.manifest === undefined ? [[join(root, "manifest.json"), manifestText]] : [];
   if (options.registry !== undefined) {
     const listing = plugin.listing;
     if (!listing) {
       process.stderr.write("--registry was given, but the plug-in declares no listing\n");
       return 1;
     }
-    const version = (JSON.parse(readFileSync(join(root, "package.json"), "utf-8")) as { version: string }).version;
+    const version =
+      options.manifest === undefined
+        ? (JSON.parse(readFileSync(join(root, "package.json"), "utf-8")) as { version: string }).version
+        : listing.version;
     if (version === listing.version) {
       const avatar = readFileSync(resolve(root, listing.avatar));
       const source = resolve(root, options.registry, listing.publisher, plugin.uid);
@@ -185,7 +246,7 @@ async function bundleWidget(esbuild: Esbuild, root: string, module: string): Pro
  * runs no hooks and asks for no scopes, and only a container plug-in's listing
  * names an image.
  */
-function kindProblems(plugin: AnyPlugin): string[] {
+function kindProblems(plugin: ListedPlugin): string[] {
   const problems: string[] = [];
   if (plugin.hosts) {
     if (Object.keys(plugin.hooks ?? {}).length) problems.push("hooks: a declarative plug-in runs no hooks");
@@ -213,7 +274,7 @@ function composeProblems({ service, baseUrl }: NonNullable<ListingDeclaration["c
 }
 
 /** The registry source listing: what the catalogue shows, this version, and the registration, a container's or a declarative plug-in's. */
-function listingSource(plugin: AnyPlugin, avatar: Buffer): Record<string, unknown> {
+function listingSource(plugin: ListedPlugin, avatar: Buffer): Record<string, unknown> {
   const listing = plugin.listing!;
   return {
     schema: 1,
@@ -241,7 +302,7 @@ function listingSource(plugin: AnyPlugin, avatar: Buffer): Record<string, unknow
 }
 
 /** A listing's registration: the plug-in's kind, and a container's image and Compose service. */
-export function registrationOf(plugin: AnyPlugin): Record<string, unknown> {
+export function registrationOf(plugin: ListedPlugin): Record<string, unknown> {
   const listing = plugin.listing!;
   return {
     ...(plugin.hosts ? { kind: "declarative" } : { kind: "container", image: listing.image }),
