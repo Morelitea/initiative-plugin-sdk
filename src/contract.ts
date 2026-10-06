@@ -1346,4 +1346,4 @@ export interface Manifest {
    * communities that install the plug-in.
    */
   dashboards?: BundledDashboard[];
-}
+}// hand edit: generated file out of date
