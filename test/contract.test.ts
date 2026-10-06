@@ -110,7 +110,7 @@ describe("the schema draws its vocabulary from the contract", () => {
     // registry; a test there holds the two equal.
     const tools = [
       "projects",
-      "documents",
+      "files",
       "queues",
       "counter_groups",
       "calendars",

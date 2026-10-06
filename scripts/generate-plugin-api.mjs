@@ -171,8 +171,9 @@ function emit(spec) {
       const body = operation.requestBody;
       if (body) {
         const json = body.content?.["application/json"];
-        if (!json) fail(`${id} takes a body that is not JSON`);
-        shape.push(`    body: ${tsType(json.schema ?? {}, "    ")};`);
+        const form = body.content?.["multipart/form-data"];
+        if (!json && !form) fail(`${id} takes a body that is neither JSON nor a form`);
+        shape.push(`    body: ${json ? tsType(json.schema ?? {}, "    ") : "FormData"};`);
         fields.push(`body${body.required ? "" : "?"}: ${op}["body"]`);
       }
       const status = Object.keys(operation.responses).filter((code) => /^2\d\d$/.test(code)).sort()[0];

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://initiative.morelitea.com/schemas/env-contract.json",
+  "title": "Initiative app deployment contract",
+  "description": "What an app requires of whoever deploys it, published as data at env-contract.json in the app's repository root.\n\nEvery app in the set publishes one, generated from its own settings declaration and committed — because whoever reads it has a checkout, not a build. A deployment tool reads these instead of parsing each app's source, which is how a setting enforced by a validator rather than by a missing default came to be absent from the Helm chart until 2026-09-23.\n\nThe classes exist because 'required' is the distinction that misleads. An app with 131 settings and 3 mandatory ones is easy to deploy; an app that presents all 131 as configuration is not, and they look identical until someone splits them up.",
+  "type": "object",
+  "required": ["service", "env_prefix", "required", "registration", "runtime", "env_only", "optional"],
+  "additionalProperties": true,
+  "properties": {
+    "service": {
+      "type": "string",
+      "description": "The app's own name, matching its image and its repository."
+    },
+    "public_id": {
+      "type": "string",
+      "description": "The app's id in the Initiative App Protocol registration, for an app that registers. Absent for Initiative itself, which is what apps register WITH."
+    },
+    "env_prefix": {
+      "type": "string",
+      "description": "Prepended to every setting name to get the environment variable. Empty for most; initiative-billing declares lower-case fields with 'BILLING_'. Names elsewhere in this file are always the ENV NAME, already prefixed — this field is for mapping back."
+    },
+    "required": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The app will not start without these. Includes settings enforced by a validator, not only those lacking a default — the distinction a source parser misses."
+    },
+    "registration": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Credentials a third-party vendor issues when this deployment is registered there. Deferrable by construction: an app holding none of them starts anyway and serves the one route that registers it, opened by INITIATIVE_APP_SETUP_TOKEN (see src/setup.ts). A deployment tool does not need these up front, and saying so is the point of the class."
+    },
+    "runtime": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Read once as a FIRST-BOOT SEED, then owned by a database row and edited in the app's own settings UI. An operator needs none of these at deploy time, and a deployment tool should not carry them as deploy-time secrets: the credential-bearing ones are encrypted at rest and rotate with the app's SECRET_KEY, which a values file cannot do."
+    },
+    "env_only": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Operator-supplied values with no database path, so the environment is the only place to set them. These, and only these, are what a deployment tool genuinely must carry as configuration."
+    },
+    "optional": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Tunables whose defaults work. Present so the contract is a complete account of the app's settings rather than a list of the interesting ones."
+    },
+    "fail_closed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Settings whose absence takes a whole surface dark while the service stays up. The class 'required' cannot express for a service designed to boot unconfigured — initiative-billing is the case: everything has a default, so its useful contract is what goes dark, not what is mandatory."
+    },
+    "default_unsuitable_for_production": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Settings with a default that is correct for a first run and wrong for a real deployment — billing's database_url points at a local SQLite file, which is data loss the first time a pod rolls. Not required, not fail-closed: silently fine until it is not."
+    }
+  }
+}
