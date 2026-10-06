@@ -6,7 +6,7 @@ If you find a security weakness in this repository, please report it privately.
 **Do not open a public issue** — an issue is visible to everyone, including
 before there is a fix.
 
-Email **security@morelitea.com** with:
+Email **security@beyonders.studio** with:
 
 - what you found
 - how to reproduce it

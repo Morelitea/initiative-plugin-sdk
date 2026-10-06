@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://initiative.morelitea.com/schemas/env-contract.json",
+  "$id": "https://initiativetasks.com/schemas/env-contract.json",
   "title": "Initiative app deployment contract",
   "description": "What an app requires of whoever deploys it, published as data at env-contract.json in the app's repository root.\n\nEvery app in the set publishes one, generated from its own settings declaration and committed — because whoever reads it has a checkout, not a build. A deployment tool reads these instead of parsing each app's source, which is how a setting enforced by a validator rather than by a missing default came to be absent from the Helm chart until 2026-09-23.\n\nThe classes exist because 'required' is the distinction that misleads. An app with 131 settings and 3 mandatory ones is easy to deploy; an app that presents all 131 as configuration is not, and they look identical until someone splits them up.",
   "type": "object",
