@@ -127,6 +127,8 @@ describe("the schema draws its vocabulary from the contract", () => {
       "relationships:write",
       "tags:read",
       "tags:write",
+      "properties:read",
+      "properties:write",
       "sharing:read",
       "sharing:write",
       "members:read",
