@@ -227,6 +227,7 @@ export function validateManifest(manifest: unknown, options: { publicId?: string
     ...scheduleProblems(body),
     ...automationProblems(body),
     ...summaryProblems(body),
+    ...measureProblems(body),
     ...kindProblems(body),
     ...declarativeProblems(body),
   ];
@@ -276,6 +277,42 @@ function summaryProblems(body: Manifest): ValidationProblem[] {
         "read for a community, and there is no form to answer a parameter in",
     });
   }
+  return problems;
+}
+
+/**
+ * Every return counted against something it cannot be counted against.
+ *
+ * `of` pairs a figure with its ceiling so a consumer can draw the two as one
+ * measure. A pair is only drawable when both halves are one whole number each:
+ * a list has no single figure, and a date or a label has no proportion.
+ */
+function measureProblems(body: Manifest): ValidationProblem[] {
+  const problems: ValidationProblem[] = [];
+  (body.endpoints ?? []).forEach((endpoint, e) => {
+    const returns = endpoint.returns ?? [];
+    returns.forEach((item, r) => {
+      if (item.of === undefined) return;
+      const where = `/endpoints/${e}/returns/${r}/of`;
+      if (item.of === item.key) {
+        problems.push({ where, message: `'${item.key}' is counted against itself` });
+        return;
+      }
+      const ceiling = returns.find((candidate) => candidate.key === item.of);
+      if (!ceiling) {
+        problems.push({ where, message: `'${item.of}' is not a return of this endpoint` });
+        return;
+      }
+      for (const half of [item, ceiling]) {
+        if (half.type !== "int" || half.list) {
+          problems.push({
+            where,
+            message: `'${half.key}' is not a single 'int', so the pair cannot be drawn as one measure`,
+          });
+        }
+      }
+    });
+  });
   return problems;
 }
 

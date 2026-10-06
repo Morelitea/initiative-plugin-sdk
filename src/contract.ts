@@ -158,6 +158,8 @@ export const CAPS = {
   expressionTimeMs: 1000,
   expressionDepth: 500,
   expressionOutputBytes: 1048576,
+  minimumAgeRegions: 64,
+  minimumAgeYears: 21,
 } as const;
 
 /** The character sets ids and paths are drawn from. */
@@ -190,7 +192,7 @@ export const FIELDS = {
   githubAppManifestSetup: ["kind", "app", "values"],
   githubAppManifest: ["name", "url", "public", "default_permissions", "default_events"],
   endpointParam: ["key", "type", "required", "label", "options", "options_from", "list"],
-  endpointReturn: ["key", "type", "label", "list"],
+  endpointReturn: ["key", "type", "label", "list", "of"],
   connection: ["id", "scope", "label", "fields", "flow", "token", "access_hint", "health"],
   connectionFlow: ["type", "authorize_url", "token_url", "client_id", "client_secret", "scopes", "pkce", "authorize_params", "install_url", "after_connect", "revoke", "revoke_url"],
   connectionToken: ["type", "exchange_url", "iss", "key", "alg", "lifetime"],
@@ -217,7 +219,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["plugin_kind", "service", "features", "default_name", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
 } as const;
 
 export type Identifier = string;
@@ -441,6 +443,15 @@ export interface EndpointReturn {
    * rather than a second set of types.
    */
   list?: boolean;
+  /**
+   * Another return of this same endpoint that this one is counted against:
+   * 'used' of 'allowed', so a consumer can draw the pair as one measure. Both
+   * must be single 'int' returns, and a return is never counted against itself.
+   * The other return answering null means there is no ceiling, and the figure
+   * stands alone. Absent: a figure in its own right — a balance, a tally, a
+   * date it resets.
+   */
+  of?: Identifier;
 }
 
 export interface Connection {
@@ -1288,6 +1299,18 @@ export interface Manifest {
    */
   features: Feature[];
   default_name?: string;
+  /**
+   * How old somebody must be to use this plug-in, by where they are. Keys are
+   * ISO 3166-1 alpha-2 country codes, upper case, and 'default' for every
+   * country not listed: {"default": 16, "US": 13}. The age of digital consent
+   * differs by country, inside the EU as well as outside it, which is why a
+   * region is a country rather than a regime. Absent, or a country with no
+   * entry and no 'default': the deployment's own minimum applies. A
+   * declaration, not a gate: whether a deployment enforces it, and how it
+   * learns somebody's age and country, are its decisions. At most 64 entries,
+   * each from 13 to 21.
+   */
+  minimum_age?: Record<string, number>;
   /**
    * Declarative plug-ins, which must name at least one: every host their
    * requests, paging and links may reach. A container plug-in names none.
