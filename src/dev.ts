@@ -1,15 +1,15 @@
 /**
- * `initiative-app dev --initiative <url> --api-key <key>`: a declarative app
+ * `initiative-plugin dev --initiative <url> --api-key <key>`: a declarative plug-in
  * on your own deployment, uploaded again each time its source changes.
  *
- * Each pass builds the app, packs its listing file (`pack.ts`) and uploads it
+ * Each pass builds the plug-in, packs its listing file (`pack.ts`) and uploads it
  * with its picture, as the owner whose personal API key is given: the
- * deployment publishes it as its own app, on the shelf straight away. The
+ * deployment publishes it as its own plug-in, on the shelf straight away. The
  * upload is versioned `<listing version>-dev.<digest of the file>`, since a
- * deployment publishes each version once; communities that installed the app
+ * deployment publishes each version once; communities that installed the plug-in
  * move to it from its Update button, or on their own if they follow updates.
  *
- * It watches the directory holding the app's definition, and builds again a
+ * It watches the directory holding the plug-in's definition, and builds again a
  * moment after the last change there.
  */
 
@@ -21,10 +21,10 @@ import { bundler, compile } from "./build.js";
 import { listingFile } from "./pack.js";
 
 export interface DevOptions {
-  /** The app's package directory. */
+  /** The plug-in's package directory. */
   root: string;
-  /** The module whose default export is the app's definition, relative to `root`. */
-  app: string;
+  /** The module whose default export is the plug-in's definition, relative to `root`. */
+  plugin: string;
   /** The deployment's address, such as `https://initiative.example.com`. */
   initiative: string;
   /** A personal API key of an account that may configure the deployment. */
@@ -36,7 +36,7 @@ export interface DevOptions {
 /** How long the source must be still before it is built again, in milliseconds. */
 const SETTLE_MS = 200;
 
-/** Upload the app, then again on each change. Answers the process's exit code. */
+/** Upload the plug-in, then again on each change. Answers the process's exit code. */
 export async function dev(options: DevOptions): Promise<number> {
   const esbuild = await bundler("dev");
   if (!esbuild) return 1;
@@ -68,18 +68,18 @@ export async function dev(options: DevOptions): Promise<number> {
   const upload = async (): Promise<number | null> => {
     let packed;
     try {
-      const compiled = await compile(esbuild, root, options.app);
+      const compiled = await compile(esbuild, root, options.plugin);
       if (compiled.problems) {
         for (const problem of compiled.problems) process.stderr.write(`${problem}\n`);
         return null;
       }
-      if (!compiled.app.hosts) {
+      if (!compiled.plugin.hosts) {
         process.stderr.write(
-          "dev uploads a declarative app; pack a container app's listing and register its service on the deployment\n"
+          "dev uploads a declarative plug-in; pack a container plug-in's listing and register its service on the deployment\n"
         );
         return 1;
       }
-      packed = listingFile(compiled.app, compiled.manifest, root);
+      packed = listingFile(compiled.plugin, compiled.manifest, root);
     } catch (error) {
       process.stderr.write(`${(error as Error).message}\n`);
       return null;
@@ -118,7 +118,7 @@ export async function dev(options: DevOptions): Promise<number> {
   if (first !== null) return first;
   if (options.signal?.aborted) return 0;
 
-  const source = dirname(resolve(root, options.app));
+  const source = dirname(resolve(root, options.plugin));
   process.stdout.write(`watching ${relative(process.cwd(), source) || "."} for changes\n`);
   return new Promise((done) => {
     const watcher = watch(source, { recursive: true });

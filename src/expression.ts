@@ -1,5 +1,5 @@
 /**
- * JSONata, as Initiative evaluates a declarative app's expressions.
+ * JSONata, as Initiative evaluates a declarative plug-in's expressions.
  *
  * Standard JSONata, the reference implementation, with no functions added.
  * Every evaluation is bounded by three of the contract's caps, which

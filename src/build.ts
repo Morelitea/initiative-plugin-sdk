@@ -1,11 +1,11 @@
 /**
- * `initiative-app build`: the files an app's definition produces.
+ * `initiative-plugin build`: the files a plug-in's definition produces.
  *
  * - `manifest.json`: the manifest, with each widget's module bundled into its
  *   `module_source`, after `validateManifest` has passed it. That parses
- *   every JSONata expression a declarative app gives, so one that does not
+ *   every JSONata expression a declarative plug-in gives, so one that does not
  *   parse fails the build at its place in the manifest.
- * - With `--registry <dir>`, the app's registry source under
+ * - With `--registry <dir>`, the plug-in's registry source under
  *   `<dir>/<publisher>/<uid>/`: `listing.json`, this version's
  *   `<version>/manifest.json` and the avatar. It is written only while the
  *   listing names the package's own version: between releases the package
@@ -15,7 +15,7 @@
  * With `--check` nothing is written, and any file that differs from what would
  * be written is a failure.
  *
- * Bundling uses esbuild, which the app installs beside the SDK
+ * Bundling uses esbuild, which the plug-in installs beside the SDK
  * (`npm install --save-dev esbuild`). Nothing at run time needs it.
  */
 
@@ -25,16 +25,16 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { CAPS } from "./contract.js";
-import { manifestOf, type AnyApp, type ListingDeclaration } from "./define.js";
+import { manifestOf, type AnyPlugin, type ListingDeclaration } from "./define.js";
 import type { Manifest } from "./contract.js";
 import { validateManifest } from "./validate.js";
 
 export interface BuildOptions {
-  /** The app's package directory. */
+  /** The plug-in's package directory. */
   root: string;
-  /** The module whose default export is the app's definition, relative to `root`. */
-  app: string;
-  /** Where registry sources live; the app's is written under `<publisher>/<uid>/`. */
+  /** The module whose default export is the plug-in's definition, relative to `root`. */
+  plugin: string;
+  /** Where registry sources live; the plug-in's is written under `<publisher>/<uid>/`. */
   registry?: string;
   check: boolean;
 }
@@ -46,23 +46,23 @@ export async function bundler(command: string): Promise<Esbuild | null> {
   try {
     return await import("esbuild");
   } catch {
-    process.stderr.write(`initiative-app ${command} bundles with esbuild: npm install --save-dev esbuild\n`);
+    process.stderr.write(`initiative-plugin ${command} bundles with esbuild: npm install --save-dev esbuild\n`);
     return null;
   }
 }
 
-/** What a definition builds: the app and its manifest, or every problem that stops it. */
-export type Compiled = { app: AnyApp; manifest: Manifest; problems?: never } | { problems: string[] };
+/** What a definition builds: the plug-in and its manifest, or every problem that stops it. */
+export type Compiled = { plugin: AnyPlugin; manifest: Manifest; problems?: never } | { problems: string[] };
 
 /**
- * Load the app's definition, bundle its widgets and check the manifest they
+ * Load the plug-in's definition, bundle its widgets and check the manifest they
  * make, with nothing written.
  */
 export async function compile(esbuild: Esbuild, root: string, entry: string): Promise<Compiled> {
-  const app = await loadApp(esbuild, root, entry);
+  const plugin = await loadPlugin(esbuild, root, entry);
   const modules: Record<string, string> = {};
   const problems: string[] = [];
-  for (const [id, widget] of Object.entries(app.widgets ?? {})) {
+  for (const [id, widget] of Object.entries(plugin.widgets ?? {})) {
     const source = await bundleWidget(esbuild, root, widget.module);
     const bytes = Buffer.byteLength(source, "utf-8");
     if (bytes > CAPS.moduleSourceBytes) {
@@ -70,41 +70,41 @@ export async function compile(esbuild: Esbuild, root: string, entry: string): Pr
     }
     modules[id] = source;
   }
-  const manifest = manifestOf(app, modules);
+  const manifest = manifestOf(plugin, modules);
   problems.push(
-    ...validateManifest(manifest, { publicId: app.publicId }).map((problem) => `manifest${problem.where}: ${problem.message}`)
+    ...validateManifest(manifest, { publicId: plugin.publicId }).map((problem) => `manifest${problem.where}: ${problem.message}`)
   );
-  problems.push(...kindProblems(app));
-  if (app.listing?.compose) problems.push(...composeProblems(app.listing.compose));
-  return problems.length ? { problems } : { app, manifest };
+  problems.push(...kindProblems(plugin));
+  if (plugin.listing?.compose) problems.push(...composeProblems(plugin.listing.compose));
+  return problems.length ? { problems } : { plugin, manifest };
 }
 
-/** Build, or check, the app's files. Answers the process's exit code. */
+/** Build, or check, the plug-in's files. Answers the process's exit code. */
 export async function build(options: BuildOptions): Promise<number> {
   const esbuild = await bundler("build");
   if (!esbuild) return 1;
   const root = resolve(options.root);
-  const compiled = await compile(esbuild, root, options.app);
+  const compiled = await compile(esbuild, root, options.plugin);
   if (compiled.problems) {
     for (const problem of compiled.problems) process.stderr.write(`${problem}\n`);
     return 1;
   }
-  const { app, manifest } = compiled;
+  const { plugin, manifest } = compiled;
 
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
   const outputs: Array<[string, string | Buffer]> = [[join(root, "manifest.json"), manifestText]];
   if (options.registry !== undefined) {
-    const listing = app.listing;
+    const listing = plugin.listing;
     if (!listing) {
-      process.stderr.write("--registry was given, but the app declares no listing\n");
+      process.stderr.write("--registry was given, but the plug-in declares no listing\n");
       return 1;
     }
     const version = (JSON.parse(readFileSync(join(root, "package.json"), "utf-8")) as { version: string }).version;
     if (version === listing.version) {
       const avatar = readFileSync(resolve(root, listing.avatar));
-      const source = resolve(root, options.registry, listing.publisher, app.uid);
+      const source = resolve(root, options.registry, listing.publisher, plugin.uid);
       outputs.push(
-        [join(source, "listing.json"), `${JSON.stringify(listingSource(app, avatar), null, 2)}\n`],
+        [join(source, "listing.json"), `${JSON.stringify(listingSource(plugin, avatar), null, 2)}\n`],
         [join(source, listing.version, "manifest.json"), manifestText],
         [join(source, "assets", basename(listing.avatar)), avatar]
       );
@@ -119,7 +119,7 @@ export async function build(options: BuildOptions): Promise<number> {
     if (options.check) {
       const current = existsSync(path) ? readFileSync(path) : null;
       if (!current || !current.equals(Buffer.from(content))) {
-        process.stderr.write(`${name} is out of date: run initiative-app build\n`);
+        process.stderr.write(`${name} is out of date: run initiative-plugin build\n`);
         stale = true;
       }
     } else {
@@ -131,9 +131,9 @@ export async function build(options: BuildOptions): Promise<number> {
   return stale ? 1 : 0;
 }
 
-/** The app's definition, compiled from its TypeScript and imported. */
-async function loadApp(esbuild: Esbuild, root: string, entry: string): Promise<AnyApp> {
-  const outfile = join(root, "node_modules", ".cache", "initiative-app", `app-${process.pid}-${Date.now()}.mjs`);
+/** The plug-in's definition, compiled from its TypeScript and imported. */
+async function loadPlugin(esbuild: Esbuild, root: string, entry: string): Promise<AnyPlugin> {
+  const outfile = join(root, "node_modules", ".cache", "initiative-plugin", `plugin-${process.pid}-${Date.now()}.mjs`);
   await esbuild.build({
     entryPoints: [resolve(root, entry)],
     outfile,
@@ -144,12 +144,12 @@ async function loadApp(esbuild: Esbuild, root: string, entry: string): Promise<A
     logLevel: "error",
   });
   try {
-    const loaded = (await import(pathToFileURL(outfile).href)) as { default?: AnyApp };
-    const app = loaded.default;
-    if (!app || typeof app.publicId !== "string") {
-      throw new Error(`${entry} must export the app's definition as its default export`);
+    const loaded = (await import(pathToFileURL(outfile).href)) as { default?: AnyPlugin };
+    const plugin = loaded.default;
+    if (!plugin || typeof plugin.publicId !== "string") {
+      throw new Error(`${entry} must export the plug-in's definition as its default export`);
     }
-    return app;
+    return plugin;
   } finally {
     rmSync(outfile, { force: true });
   }
@@ -181,18 +181,18 @@ async function bundleWidget(esbuild: Esbuild, root: string, module: string): Pro
 }
 
 /**
- * What a definition says that its manifest does not show: a declarative app
- * runs no hooks and asks for no scopes, and only a container app's listing
+ * What a definition says that its manifest does not show: a declarative plug-in
+ * runs no hooks and asks for no scopes, and only a container plug-in's listing
  * names an image.
  */
-function kindProblems(app: AnyApp): string[] {
+function kindProblems(plugin: AnyPlugin): string[] {
   const problems: string[] = [];
-  if (app.hosts) {
-    if (Object.keys(app.hooks ?? {}).length) problems.push("hooks: a declarative app runs no hooks");
-    if (app.scopes) problems.push("scopes: a declarative app asks for none, since it does not call Initiative");
-    if (app.listing?.image || app.listing?.compose) problems.push("listing: a declarative app has no image or compose service");
-  } else if (app.listing && !app.listing.image) {
-    problems.push("listing: a container app names its image");
+  if (plugin.hosts) {
+    if (Object.keys(plugin.hooks ?? {}).length) problems.push("hooks: a declarative plug-in runs no hooks");
+    if (plugin.scopes) problems.push("scopes: a declarative plug-in asks for none, since it does not call Initiative");
+    if (plugin.listing?.image || plugin.listing?.compose) problems.push("listing: a declarative plug-in has no image or compose service");
+  } else if (plugin.listing && !plugin.listing.image) {
+    problems.push("listing: a container plug-in names its image");
   }
   return problems;
 }
@@ -212,16 +212,16 @@ function composeProblems({ service, baseUrl }: NonNullable<ListingDeclaration["c
   return problems;
 }
 
-/** The registry source listing: what the catalogue shows, this version, and the registration, a container's or a declarative app's. */
-function listingSource(app: AnyApp, avatar: Buffer): Record<string, unknown> {
-  const listing = app.listing!;
+/** The registry source listing: what the catalogue shows, this version, and the registration, a container's or a declarative plug-in's. */
+function listingSource(plugin: AnyPlugin, avatar: Buffer): Record<string, unknown> {
+  const listing = plugin.listing!;
   return {
     schema: 1,
-    uid: app.uid,
-    public_id: app.publicId,
+    uid: plugin.uid,
+    public_id: plugin.publicId,
     publisher: listing.publisher,
-    kind: "app",
-    name: app.name,
+    kind: "plugin",
+    name: plugin.name,
     summary: listing.summary,
     ...(listing.description !== undefined ? { description: listing.description } : {}),
     avatar: {
@@ -236,16 +236,16 @@ function listingSource(app: AnyApp, avatar: Buffer): Record<string, unknown> {
         ...(listing.releaseNotes !== undefined ? { release_notes: listing.releaseNotes } : {}),
       },
     ],
-    registration: registrationOf(app),
+    registration: registrationOf(plugin),
   };
 }
 
-/** A listing's registration: the app's kind, and a container's image and Compose service. */
-export function registrationOf(app: AnyApp): Record<string, unknown> {
-  const listing = app.listing!;
+/** A listing's registration: the plug-in's kind, and a container's image and Compose service. */
+export function registrationOf(plugin: AnyPlugin): Record<string, unknown> {
+  const listing = plugin.listing!;
   return {
-    ...(app.hosts ? { kind: "declarative" } : { kind: "container", image: listing.image }),
-    scope_ceiling: [...(listing.scopeCeiling ?? app.scopes ?? [])],
+    ...(plugin.hosts ? { kind: "declarative" } : { kind: "container", image: listing.image }),
+    scope_ceiling: [...(listing.scopeCeiling ?? plugin.scopes ?? [])],
     reference_sectors: [...(listing.referenceSectors ?? [])],
     ...(listing.compose ? { compose: { service: listing.compose.service, base_url: listing.compose.baseUrl } } : {}),
   };

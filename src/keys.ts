@@ -1,17 +1,17 @@
 /**
- * Your app's signing keys.
+ * Your plug-in's signing keys.
  *
- * An app proves who it is to Initiative by signing a short JWT with its own
+ * A plug-in proves who it is to Initiative by signing a short JWT with its own
  * private key (`private_key_jwt`, RFC 7523). The deployment's operator
- * registers the matching public keys — a JWKS — against your app's public id,
- * and the private key never leaves your app.
+ * registers the matching public keys — a JWKS — against your plug-in's public id,
+ * and the private key never leaves your plug-in.
  *
  * Two algorithms are supported, and the deployment picks the one to check by
  * the registered key's type: `RS256` for an RSA key, `ES256` for a P-256 key.
  *
  * Every key carries a `kid`. Each JWT names the `kid` it was signed with, so
  * rotating is: generate a new key, have the operator register a JWKS holding
- * both public keys, switch your app to the new one, then drop the old entry.
+ * both public keys, switch your plug-in to the new one, then drop the old entry.
  */
 
 import {
@@ -23,14 +23,14 @@ import {
   type KeyObject,
 } from "node:crypto";
 
-/** The algorithms an app key may use. */
-export type AppKeyAlgorithm = "RS256" | "ES256";
+/** The algorithms a plug-in key may use. */
+export type PluginKeyAlgorithm = "RS256" | "ES256";
 
 /** One public key, as a JWK. */
 export interface PublicJwk {
   kty: "RSA" | "EC";
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
   use: "sig";
   n?: string;
   e?: string;
@@ -39,26 +39,26 @@ export interface PublicJwk {
   y?: string;
 }
 
-/** A JSON Web Key Set: what the operator registers for your app. */
+/** A JSON Web Key Set: what the operator registers for your plug-in. */
 export interface Jwks {
   keys: PublicJwk[];
 }
 
 /** A private key ready to sign with. */
-export interface AppSigningKey {
+export interface PluginSigningKey {
   key: KeyObject;
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
 }
 
-/** What {@link generateAppKeys} returns. */
-export interface GeneratedAppKeys {
+/** What {@link generatePluginKeys} returns. */
+export interface GeneratedPluginKeys {
   /** PKCS#8 PEM. Keep it secret, and out of source control. */
   privateKeyPem: string;
   /** The public half, to register with the deployment. */
   jwks: Jwks;
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
 }
 
 /**
@@ -67,9 +67,9 @@ export interface GeneratedAppKeys {
  * `kid` defaults to the key's RFC 7638 thumbprint, so the same key always gets
  * the same id and two keys never share one.
  */
-export function generateAppKeys(
-  options: { alg?: AppKeyAlgorithm; kid?: string } = {}
-): GeneratedAppKeys {
+export function generatePluginKeys(
+  options: { alg?: PluginKeyAlgorithm; kid?: string } = {}
+): GeneratedPluginKeys {
   const alg = options.alg ?? "RS256";
   const { privateKey } =
     alg === "RS256"
@@ -93,13 +93,13 @@ export function generateAppKeys(
  * The algorithm follows from the key: an RSA key signs `RS256`, a P-256 key
  * signs `ES256`, and any other key is refused.
  */
-export function loadPrivateKey(pem: string, kid?: string): AppSigningKey {
+export function loadPrivateKey(pem: string, kid?: string): PluginSigningKey {
   const key = createPrivateKey(pem);
   return { key, kid: kid || thumbprint(key), alg: algorithmOf(key) };
 }
 
 /** The JWKS for one signing key: its public half, with its `kid`. */
-export function publicJwks(signing: AppSigningKey): Jwks {
+export function publicJwks(signing: PluginSigningKey): Jwks {
   const jwk = createPublicKey(signing.key).export({ format: "jwk" }) as Record<
     string,
     string
@@ -120,7 +120,7 @@ export function publicJwks(signing: AppSigningKey): Jwks {
 }
 
 /** The algorithm a key signs with, from its type. */
-export function algorithmOf(key: KeyObject): AppKeyAlgorithm {
+export function algorithmOf(key: KeyObject): PluginKeyAlgorithm {
   if (key.asymmetricKeyType === "rsa") return "RS256";
   if (key.asymmetricKeyType === "ec" && key.asymmetricKeyDetails?.namedCurve === "prime256v1") {
     return "ES256";
@@ -131,14 +131,14 @@ export function algorithmOf(key: KeyObject): AppKeyAlgorithm {
 }
 
 /**
- * Sign a compact JWT with an app key. `typ` goes in the header; an app's own
+ * Sign a compact JWT with a plug-in key. `typ` goes in the header; a plug-in's own
  * assertions are plain `JWT`.
  *
  * ES256 signatures are written in the JOSE form (`r || s`, 64 bytes), which is
  * what `ieee-p1363` produces.
  */
 export function signJwt(
-  signing: AppSigningKey,
+  signing: PluginSigningKey,
   claims: Record<string, unknown>,
   typ = "JWT"
 ): string {
@@ -157,8 +157,8 @@ function base64url(text: string): string {
 
 /**
  * A public key's fingerprint: its RFC 7638 SHA-256 thumbprint, base64url
- * without padding. The app logs it at start, and Initiative shows the same
- * value for the key it reads from the app.
+ * without padding. The plug-in logs it at start, and Initiative shows the same
+ * value for the key it reads from the plug-in.
  */
 export function jwkThumbprint(jwk: PublicJwk): string {
   const members =

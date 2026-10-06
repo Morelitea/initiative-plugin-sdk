@@ -1,5 +1,5 @@
 /**
- * `initiative-app init`: an example copied into a new directory, with a uid of
+ * `initiative-plugin init`: an example copied into a new directory, with a uid of
  * its own and its package named after the directory.
  */
 
@@ -36,14 +36,14 @@ const uidOf = (path: string) => /uid: "([^"]+)"/.exec(readFileSync(path, "utf-8"
 
 describe("init", () => {
   it("copies the example with a fresh uid, its package named after the directory", () => {
-    const dir = join(parent, "My App");
+    const dir = join(parent, "My Plugin");
     expect(init({ dir, example: "minimal" })).toBe(0);
-    const uid = uidOf(join(dir, "src", "app.ts"));
-    expect(uid).not.toBe(uidOf(join(example, "src", "app.ts")));
+    const uid = uidOf(join(dir, "src", "plugin.ts"));
+    expect(uid).not.toBe(uidOf(join(example, "src", "plugin.ts")));
     expect([...uid].every((char) => CHARSETS.uid.includes(char))).toBe(true);
-    expect(JSON.parse(readFileSync(join(dir, "package.json"), "utf-8")).name).toBe("my-app");
-    expect(readFileSync(join(dir, "src", "app.ts"), "utf-8").replace(uid, "")).toBe(
-      readFileSync(join(example, "src", "app.ts"), "utf-8").replace(uidOf(join(example, "src", "app.ts")), "")
+    expect(JSON.parse(readFileSync(join(dir, "package.json"), "utf-8")).name).toBe("my-plugin");
+    expect(readFileSync(join(dir, "src", "plugin.ts"), "utf-8").replace(uid, "")).toBe(
+      readFileSync(join(example, "src", "plugin.ts"), "utf-8").replace(uidOf(join(example, "src", "plugin.ts")), "")
     );
     expect(readFileSync(join(dir, "assets", "avatar.png"))).toEqual(readFileSync(join(example, "assets", "avatar.png")));
   });

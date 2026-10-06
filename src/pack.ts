@@ -1,6 +1,6 @@
 /**
- * `initiative-app pack`: the app as one listing file, the file a self-hosted
- * deployment publishes as its own app.
+ * `initiative-plugin pack`: the plug-in as one listing file, the file a self-hosted
+ * deployment publishes as its own plug-in.
  *
  * The listing file is the shape a deployment's listing upload
  * (`POST /api/v1/marketplace/local/upload`, as `{"manifest": <file>}`) and its
@@ -21,13 +21,13 @@ import { relative, resolve } from "node:path";
 
 import { bundler, compile, registrationOf } from "./build.js";
 import type { Manifest } from "./contract.js";
-import type { AnyApp } from "./define.js";
+import type { AnyPlugin } from "./define.js";
 
 export interface PackOptions {
-  /** The app's package directory. */
+  /** The plug-in's package directory. */
   root: string;
-  /** The module whose default export is the app's definition, relative to `root`. */
-  app: string;
+  /** The module whose default export is the plug-in's definition, relative to `root`. */
+  plugin: string;
   /** Where to write the listing file, relative to `root`. Default: `<publicId>-<version>.json`. */
   out?: string;
 }
@@ -42,20 +42,20 @@ export interface Packed {
   avatar: Buffer | null;
 }
 
-/** The listing file for an app whose manifest `compile` made. */
-export function listingFile(app: AnyApp, manifest: Manifest, root: string): Packed {
-  const listing = app.listing;
-  if (!listing) throw new Error("pack needs the app's listing: declare `listing` in its definition");
+/** The listing file for a plug-in whose manifest `compile` made. */
+export function listingFile(plugin: AnyPlugin, manifest: Manifest, root: string): Packed {
+  const listing = plugin.listing;
+  if (!listing) throw new Error("pack needs the plug-in's listing: declare `listing` in its definition");
   const avatar = KEPT_PICTURES.test(listing.avatar) ? readFileSync(resolve(root, listing.avatar)) : null;
   // A deployment honours reference sectors only from a registry.
-  const { reference_sectors: _sectors, ...registration } = registrationOf(app);
+  const { reference_sectors: _sectors, ...registration } = registrationOf(plugin);
   return {
     avatar,
     listing: {
-      uid: app.uid,
-      public_id: app.publicId,
-      kind: "app",
-      name: app.name,
+      uid: plugin.uid,
+      public_id: plugin.publicId,
+      kind: "plugin",
+      name: plugin.name,
       publisher: listing.publisher,
       description: listing.summary,
       ...(listing.description !== undefined ? { long_description: listing.description } : {}),
@@ -69,32 +69,32 @@ export function listingFile(app: AnyApp, manifest: Manifest, root: string): Pack
   };
 }
 
-/** Write the app's listing file. Answers the process's exit code. */
+/** Write the plug-in's listing file. Answers the process's exit code. */
 export async function pack(options: PackOptions): Promise<number> {
   const esbuild = await bundler("pack");
   if (!esbuild) return 1;
   const root = resolve(options.root);
-  const compiled = await compile(esbuild, root, options.app);
+  const compiled = await compile(esbuild, root, options.plugin);
   if (compiled.problems) {
     for (const problem of compiled.problems) process.stderr.write(`${problem}\n`);
     return 1;
   }
-  const { app } = compiled;
+  const { plugin } = compiled;
   let packed: Packed;
   try {
-    packed = listingFile(app, compiled.manifest, root);
+    packed = listingFile(plugin, compiled.manifest, root);
   } catch (error) {
     process.stderr.write(`${(error as Error).message}\n`);
     return 1;
   }
-  const { avatar: picture, version } = app.listing!;
-  const path = resolve(root, options.out ?? `${app.publicId}-${version}.json`);
+  const { avatar: picture, version } = plugin.listing!;
+  const path = resolve(root, options.out ?? `${plugin.publicId}-${version}.json`);
   writeFileSync(path, `${JSON.stringify(packed.listing, null, 2)}\n`);
   process.stdout.write(
     [
-      `wrote ${relative(process.cwd(), path)}: ${app.publicId} ${version}, uid ${app.uid}`,
+      `wrote ${relative(process.cwd(), path)}: ${plugin.publicId} ${version}, uid ${plugin.uid}`,
       packed.avatar
-        ? `upload it with its picture, ${picture}, or run initiative-app dev --initiative <url> to do both`
+        ? `upload it with its picture, ${picture}, or run initiative-plugin dev --initiative <url> to do both`
         : `${picture} is not PNG, JPEG, GIF or WebP, so the listing shows the deployment's default mark`,
       "",
     ].join("\n")

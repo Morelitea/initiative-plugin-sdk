@@ -1,8 +1,8 @@
 /**
- * `initiative-app build`: the manifest with each widget bundled into it, and
+ * `initiative-plugin build`: the manifest with each widget bundled into it, and
  * the registry source while the listing names the package's version, or a
  * check that the committed files are what the definition produces. `pack`,
- * the listing file a deployment publishes as its own app, and `dev`, which
+ * the listing file a deployment publishes as its own plug-in, and `dev`, which
  * uploads it to one as Initiative's listing upload takes it, again on each
  * change.
  */
@@ -28,9 +28,9 @@ let root: string;
 let errors: string[];
 let output: string[];
 
-function app(extra = "", listing = ""): string {
+function plugin(extra = "", listing = ""): string {
   return `
-import { defineApp, defineEndpoint } from ${JSON.stringify(sdk)};
+import { definePlugin, defineEndpoint } from ${JSON.stringify(sdk)};
 
 export const count = defineEndpoint({
   direction: "read",
@@ -38,7 +38,7 @@ export const count = defineEndpoint({
   handler: async () => ({ result: { total: 1 } }),
 });
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
   uid: "K7M2QX8N4TVB9C",
   name: "Tracker",
@@ -58,12 +58,12 @@ export default defineApp({
 `;
 }
 
-/** A declarative app: one read Initiative makes and maps itself. */
+/** A declarative plug-in: one read Initiative makes and maps itself. */
 function declarative(map: string, extra = ""): string {
   return `
-import { defineApp, defineEndpoint } from ${JSON.stringify(sdk)};
+import { definePlugin, defineEndpoint } from ${JSON.stringify(sdk)};
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
   uid: "K7M2QX8N4TVB9C",
   name: "Tracker",
@@ -106,7 +106,7 @@ function write(files: Record<string, string | Buffer>): void {
 }
 
 const run = (options: { registry?: string; check?: boolean } = {}) =>
-  build({ root, app: "src/app.ts", check: false, ...options });
+  build({ root, plugin: "src/plugin.ts", check: false, ...options });
 
 beforeEach(() => {
   root = mkdtempSync(join(here, ".build-"));
@@ -122,7 +122,7 @@ beforeEach(() => {
   });
   write({
     "package.json": JSON.stringify({ name: "tracker", version: "1.2.0" }),
-    "src/app.ts": app(),
+    "src/plugin.ts": plugin(),
     "widgets/total.ts": WIDGET,
     "widgets/words.ts": 'export const label = "Open";\n',
     "assets/avatar.png": avatar,
@@ -140,7 +140,7 @@ describe("build", () => {
   it("writes the manifest with each widget bundled into one script that leaves render as a global", async () => {
     expect(await run()).toBe(0);
     const [widget] = manifest().widgets;
-    expect(widget).toMatchObject({ id: "total", endpoints: ["app.acme.tracker.count"] });
+    expect(widget).toMatchObject({ id: "total", endpoints: ["plugin.acme.tracker.count"] });
     expect(widget.module_source).not.toMatch(/\bimport\b|\bexport\b/);
     const sandbox: Record<string, unknown> = {};
     runInNewContext(widget.module_source, sandbox);
@@ -159,7 +159,7 @@ describe("build", () => {
   });
 
   it("refuses a manifest that does not validate, and writes nothing", async () => {
-    write({ "src/app.ts": app('schedules: { sweep: { every: "1m", run: async () => {} } },') });
+    write({ "src/plugin.ts": plugin('schedules: { sweep: { every: "1m", run: async () => {} } },') });
     expect(await run()).toBe(1);
     expect(errors.join("")).toContain("/schedules/0/every");
     expect(existsSync(join(root, "manifest.json"))).toBe(false);
@@ -181,7 +181,7 @@ describe("the registry source", () => {
       uid: "K7M2QX8N4TVB9C",
       public_id: "acme.tracker",
       publisher: "acme",
-      kind: "app",
+      kind: "plugin",
       name: "Tracker",
       summary: "Tickets.",
       avatar: { path: "assets/avatar.png", sha256: createHash("sha256").update(avatar).digest("hex") },
@@ -201,7 +201,7 @@ describe("the registry source", () => {
   it("carries the listing's compose snippet in its registration", async () => {
     const service = "tracker:\n  image: ${IMAGE}\n  environment:\n    INITIATIVE_URL: ${INITIATIVE_URL}\n";
     write({
-      "src/app.ts": app("", `compose: { service: ${JSON.stringify(service)}, baseUrl: "http://tracker:8080" },`),
+      "src/plugin.ts": plugin("", `compose: { service: ${JSON.stringify(service)}, baseUrl: "http://tracker:8080" },`),
     });
     expect(await run({ registry: "registry" })).toBe(0);
     const listing = JSON.parse(
@@ -213,7 +213,7 @@ describe("the registry source", () => {
   it("refuses a compose snippet with another placeholder or an address that is not http", async () => {
     const service = "tracker:\n  image: ${IMAGES}\n  command: [\"$${HOME}\"]\n";
     write({
-      "src/app.ts": app("", `compose: { service: ${JSON.stringify(service)}, baseUrl: "ftp://tracker" },`),
+      "src/plugin.ts": plugin("", `compose: { service: ${JSON.stringify(service)}, baseUrl: "ftp://tracker" },`),
     });
     expect(await run()).toBe(1);
     const text = errors.join("");
@@ -231,29 +231,29 @@ describe("the registry source", () => {
   });
 });
 
-describe("a declarative app", () => {
+describe("a declarative plug-in", () => {
   it("fails the build on an expression that does not parse, at its place", async () => {
-    write({ "src/app.ts": declarative('{"total": response.body.count') });
+    write({ "src/plugin.ts": declarative('{"total": response.body.count') });
     expect(await run()).toBe(1);
     expect(errors.join("")).toMatch(/manifest\/endpoints\/0\/map: does not parse: .* \(at character \d+\)/);
     expect(existsSync(join(root, "manifest.json"))).toBe(false);
   });
 
   it("is registered as declarative, with no image", async () => {
-    write({ "src/app.ts": declarative('{"total": response.body.count}') });
+    write({ "src/plugin.ts": declarative('{"total": response.body.count}') });
     expect(await run({ registry: "registry" })).toBe(0);
     expect(manifest()).not.toHaveProperty("service");
     const listing = JSON.parse(readFileSync(join(root, "registry", "acme", "K7M2QX8N4TVB9C", "listing.json"), "utf-8"));
     expect(listing.registration).toEqual({ kind: "declarative", scope_ceiling: [], reference_sectors: [] });
   });
 
-  it("refuses an image, and a container app's listing without one", async () => {
-    write({ "src/app.ts": declarative("{}", `image: "ghcr.io/acme/tracker@sha256:${"a".repeat(64)}"`) });
+  it("refuses an image, and a container plug-in's listing without one", async () => {
+    write({ "src/plugin.ts": declarative("{}", `image: "ghcr.io/acme/tracker@sha256:${"a".repeat(64)}"`) });
     expect(await run()).toBe(1);
-    expect(errors.join("")).toContain("listing: a declarative app has no image or compose service");
-    write({ "src/app.ts": app().replace(/image: .*\n/, "") });
+    expect(errors.join("")).toContain("listing: a declarative plug-in has no image or compose service");
+    write({ "src/plugin.ts": plugin().replace(/image: .*\n/, "") });
     expect(await run()).toBe(1);
-    expect(errors.join("")).toContain("listing: a container app names its image");
+    expect(errors.join("")).toContain("listing: a container plug-in names its image");
   });
 });
 
@@ -262,13 +262,13 @@ const picture = `/api/v1/marketplace/media/${digest(avatar)}`;
 
 describe("pack", () => {
   it("writes the listing file a deployment publishes, its picture named by its digest", async () => {
-    write({ "src/app.ts": declarative('{"total": response.body.count}') });
+    write({ "src/plugin.ts": declarative('{"total": response.body.count}') });
     expect(await run()).toBe(0);
-    expect(await pack({ root, app: "src/app.ts" })).toBe(0);
+    expect(await pack({ root, plugin: "src/plugin.ts" })).toBe(0);
     expect(JSON.parse(readFileSync(join(root, "acme.tracker-1.2.0.json"), "utf-8"))).toEqual({
       uid: "K7M2QX8N4TVB9C",
       public_id: "acme.tracker",
-      kind: "app",
+      kind: "plugin",
       name: "Tracker",
       publisher: "acme",
       description: "Tickets.",
@@ -279,9 +279,9 @@ describe("pack", () => {
     });
   });
 
-  it("packs a container app with its image, and leaves out a picture a deployment does not keep", async () => {
-    write({ "src/app.ts": app().replace("assets/avatar.png", "assets/avatar.svg"), "assets/avatar.svg": "<svg/>" });
-    expect(await pack({ root, app: "src/app.ts", out: "tracker.json" })).toBe(0);
+  it("packs a container plug-in with its image, and leaves out a picture a deployment does not keep", async () => {
+    write({ "src/plugin.ts": plugin().replace("assets/avatar.png", "assets/avatar.svg"), "assets/avatar.svg": "<svg/>" });
+    expect(await pack({ root, plugin: "src/plugin.ts", out: "tracker.json" })).toBe(0);
     const listing = JSON.parse(readFileSync(join(root, "tracker.json"), "utf-8"));
     expect(listing).not.toHaveProperty("avatar_url");
     expect(listing.release_notes).toBe("First.");
@@ -337,9 +337,9 @@ async function until(holds: () => boolean): Promise<void> {
 describe("dev", () => {
   it("uploads the listing with its picture, and again under a new version when the source changes", async () => {
     const initiative = await fakeInitiative();
-    write({ "src/app.ts": declarative('{"total": response.body.count}') });
+    write({ "src/plugin.ts": declarative('{"total": response.body.count}') });
     const stop = new AbortController();
-    const running = dev({ root, app: "src/app.ts", initiative: initiative.url, apiKey: "ppk_owner", signal: stop.signal });
+    const running = dev({ root, plugin: "src/plugin.ts", initiative: initiative.url, apiKey: "ppk_owner", signal: stop.signal });
     try {
       await until(() => initiative.uploads.length === 1);
       const [first] = initiative.uploads;
@@ -351,7 +351,7 @@ describe("dev", () => {
         `uploaded acme.tracker ${first.version} (uid K7M2QX8N4TVB9C): 201 {"uid":"K7M2QX8N4TVB9C","public_id":"acme.tracker","version":"${first.version}"}`
       );
 
-      write({ "src/app.ts": declarative('{"total": response.body.total}') });
+      write({ "src/plugin.ts": declarative('{"total": response.body.total}') });
       await until(() => initiative.uploads.length === 2);
       expect(initiative.uploads[1].version).not.toBe(first.version);
       expect(initiative.uploads[1].definition.endpoints[0].map).toBe('{"total": response.body.total}');
@@ -362,15 +362,15 @@ describe("dev", () => {
     expect(await running).toBe(0);
   });
 
-  it("stops when the deployment refuses the key, and refuses a container app", async () => {
+  it("stops when the deployment refuses the key, and refuses a container plug-in", async () => {
     const initiative = await fakeInitiative();
     try {
-      write({ "src/app.ts": declarative('{"total": response.body.count}') });
-      expect(await dev({ root, app: "src/app.ts", initiative: initiative.url, apiKey: "ppk_nobody" })).toBe(1);
+      write({ "src/plugin.ts": declarative('{"total": response.body.count}') });
+      expect(await dev({ root, plugin: "src/plugin.ts", initiative: initiative.url, apiKey: "ppk_nobody" })).toBe(1);
       expect(errors.join("")).toContain('refused the picture: 401 {"detail":"COULD_NOT_VALIDATE_CREDENTIALS"}');
-      write({ "src/app.ts": app() });
-      expect(await dev({ root, app: "src/app.ts", initiative: initiative.url, apiKey: "ppk_owner" })).toBe(1);
-      expect(errors.join("")).toContain("dev uploads a declarative app");
+      write({ "src/plugin.ts": plugin() });
+      expect(await dev({ root, plugin: "src/plugin.ts", initiative: initiative.url, apiKey: "ppk_owner" })).toBe(1);
+      expect(errors.join("")).toContain("dev uploads a declarative plug-in");
       expect(initiative.uploads).toEqual([]);
     } finally {
       initiative.close();

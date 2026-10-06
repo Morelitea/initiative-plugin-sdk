@@ -1,5 +1,5 @@
 /**
- * The app contract, as TypeScript.
+ * The plug-in contract, as TypeScript.
  *
  * GENERATED from `manifest.contract.json` by `scripts/generate.mjs`. Do not
  * edit it: change the contract and run `npm run generate`.
@@ -69,8 +69,8 @@ export const SURFACE_SCOPES: readonly SurfaceScope[] = ["community", "initiative
 export type EmbedCapability = "camera" | "clipboard-read" | "clipboard-write" | "display-capture" | "fullscreen" | "geolocation" | "microphone";
 export const EMBED_CAPABILITIES: readonly EmbedCapability[] = ["camera", "clipboard-read", "clipboard-write", "display-capture", "fullscreen", "geolocation", "microphone"];
 
-export type ListingKind = "app" | "dashboard";
-export const LISTING_KINDS: readonly ListingKind[] = ["app", "dashboard"];
+export type ListingKind = "plugin" | "dashboard";
+export const LISTING_KINDS: readonly ListingKind[] = ["plugin", "dashboard"];
 
 export type HttpMethod = "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
 export const HTTP_METHODS: readonly HttpMethod[] = ["DELETE", "GET", "PATCH", "POST", "PUT"];
@@ -135,7 +135,7 @@ export const CAPS = {
   widgetOptions: 12,
   valuesPerOption: 24,
   identityKeyParts: 4,
-  appScopes: 24,
+  pluginScopes: 24,
   schedules: 8,
   scheduleMinMinutes: 5,
   scheduleMaxMinutes: 1440,
@@ -217,14 +217,14 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["app_kind", "service", "features", "default_name", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
 } as const;
 
 export type Identifier = string;
 
 /**
- * A route on the app's own service, never an address. The deployment joins it
- * to the base URL its registration supplies.
+ * A route on the plug-in's own service, never an address. The deployment joins
+ * it to the base URL its registration supplies.
  */
 export type Path = string;
 
@@ -267,8 +267,8 @@ export interface ConnectionField {
    */
   options?: string[];
   /**
-   * Returned by the app's after_connect hook when a flow finishes; it is not
-   * typed into the settings form.
+   * Returned by the plug-in's after_connect hook when a flow finishes; it is
+   * not typed into the settings form.
    */
   managed?: boolean;
 }
@@ -300,7 +300,7 @@ export interface VendorField {
    */
   type: VendorFieldType;
   /**
-   * The app is not live on a deployment until every required value is set.
+   * The plug-in is not live on a deployment until every required value is set.
    */
   required?: boolean;
   label: LocalizedText;
@@ -325,7 +325,7 @@ export interface GithubAppManifestSetup {
   app: GithubAppManifest;
   /**
    * Which vendor value each of GitHub's answers is written to: one of this
-   * app's vendor field keys to one field of GitHub's manifest-conversion
+   * plug-in's vendor field keys to one field of GitHub's manifest-conversion
    * response. Every key must be a field of the vendor block, each response
    * field is written at most once, and 'client_secret', 'pem' and
    * 'webhook_secret' are written only to a 'secret' field.
@@ -334,7 +334,7 @@ export interface GithubAppManifestSetup {
 }
 
 /**
- * What GitHub is asked to create: the parts of a GitHub App manifest an app
+ * What GitHub is asked to create: the parts of a GitHub App manifest a plug-in
  * decides.
  */
 export interface GithubAppManifest {
@@ -376,22 +376,22 @@ export interface EndpointParam {
    */
   options?: string[];
   /**
-   * Where this parameter's values come from when only the app can know them.
-   * Names a read endpoint in THIS manifest and which of its returns holds the
-   * values; a consumer building a form asks the deployment to resolve it rather
-   * than showing a text box. For everything a manifest cannot list because the
-   * answer differs per install and changes after it — a repository, a channel,
-   * a board, a project. `options` is the other case: a set that is the same on
-   * every deployment forever. Declaring values, not a control: what to draw is
-   * still the consumer's. Resolution is server-side, inherits the source
-   * endpoint's `requires` and `cache_ttl_seconds`, and a source that cannot be
-   * resolved leaves the parameter enterable rather than unusable.
+   * Where this parameter's values come from when only the plug-in can know
+   * them. Names a read endpoint in THIS manifest and which of its returns holds
+   * the values; a consumer building a form asks the deployment to resolve it
+   * rather than showing a text box. For everything a manifest cannot list
+   * because the answer differs per install and changes after it — a repository,
+   * a channel, a board, a project. `options` is the other case: a set that is
+   * the same on every deployment forever. Declaring values, not a control: what
+   * to draw is still the consumer's. Resolution is server-side, inherits the
+   * source endpoint's `requires` and `cache_ttl_seconds`, and a source that
+   * cannot be resolved leaves the parameter enterable rather than unusable.
    */
   options_from?: {
     /**
-     * A read endpoint this same manifest declares. Not another app's: reading
-     * across apps has no consent story, and an id from elsewhere is refused on
-     * publish.
+     * A read endpoint this same manifest declares. Not another plug-in's:
+     * reading across plug-ins has no consent story, and an id from elsewhere is
+     * refused on publish.
      */
     endpoint: NamespacedId;
     /**
@@ -420,7 +420,7 @@ export interface EndpointParam {
   };
   /**
    * Several values rather than one. Cardinality is a fact about the value, so
-   * it is yours; what to draw for it is the consumer's. Without it, an app
+   * it is yours; what to draw for it is the consumer's. Without it, a plug-in
    * wanting several of something declares a string and documents a comma —
    * which nothing downstream can validate or complete.
    */
@@ -456,15 +456,15 @@ export interface Connection {
   scope: ConnectionScope;
   label: LocalizedText;
   /**
-   * Without a 'flow', what an admin types. With one, only the values the app's
-   * after_connect hook returns, and every field is 'managed'. The tokens a flow
-   * obtains are held apart from these, under reserved keys the app never
-   * declares.
+   * Without a 'flow', what an admin types. With one, only the values the
+   * plug-in's after_connect hook returns, and every field is 'managed'. The
+   * tokens a flow obtains are held apart from these, under reserved keys the
+   * plug-in never declares.
    */
   fields: ConnectionField[];
   /**
    * How the connection is established. Initiative runs it: the redirect, the
-   * code exchange, refreshing and revoking. The app never holds the vendor
+   * code exchange, refreshing and revoking. The plug-in never holds the vendor
    * client's secret or a refresh token.
    */
   flow?: ConnectionFlow;
@@ -523,16 +523,16 @@ export interface ConnectionFlow {
    * Static connections only. The vendor's install page, for a connection an
    * organization installs: the person installs first, the vendor returns to the
    * setup address with the installation's id, and one authorization trip
-   * follows so the app can check who installed it. Requires 'after_connect'.
-   * May name a vendor value as '{vendor.<key>}' and one of this connection's
-   * own fields as '{<key>}'.
+   * follows so the plug-in can check who installed it. Requires
+   * 'after_connect'. May name a vendor value as '{vendor.<key>}' and one of
+   * this connection's own fields as '{<key>}'.
    */
   install_url?: string;
   /**
    * What runs once the code is exchanged, with the fresh access token, to learn
    * the connection's managed values and an account label, or to refuse it. A
-   * container app sets true, and Initiative calls its after_connect hook; a
-   * declarative app gives the call and its mapping.
+   * container plug-in sets true, and Initiative calls its after_connect hook; a
+   * declarative plug-in gives the call and its mapping.
    */
   after_connect?: boolean | AfterConnect;
   /**
@@ -540,9 +540,9 @@ export interface ConnectionFlow {
    * posts to 'revoke_url' with the client's credentials; 'github_grant' sends
    * DELETE to 'revoke_url' (GitHub's 'Delete an app authorization') with the
    * client's credentials as HTTP Basic auth and the access token in the JSON
-   * body as 'access_token'; 'hook' calls the app's revoke hook with the tokens,
-   * so a container app's only. Absent: the tokens are deleted and nothing is
-   * sent.
+   * body as 'access_token'; 'hook' calls the plug-in's revoke hook with the
+   * tokens, so a container plug-in's only. Absent: the tokens are deleted and
+   * nothing is sent.
    */
   revoke?: RevokeMethod;
   /**
@@ -587,12 +587,13 @@ export interface ConnectionToken {
 }
 
 /**
- * The vendor's webhooks, received by Initiative at one address per app on the
- * deployment, '/api/v1/app-hooks/<public_id>'. Initiative checks each
+ * The vendor's webhooks, received by Initiative at one address per plug-in on
+ * the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each
  * delivery's signature, drops one it has already delivered, finds the
  * communities it belongs to by a value in its body, and forwards it to the
- * app's webhook hook once for each. A container app's hook receives each
- * delivery; a declarative app maps it with 'events' and 'status' instead.
+ * plug-in's webhook hook once for each. A container plug-in's hook receives
+ * each delivery; a declarative plug-in maps it with 'events' and 'status'
+ * instead.
  */
 export interface Webhooks {
   verify: WebhookVerify;
@@ -604,13 +605,14 @@ export interface Webhooks {
   dedup: string;
   route: WebhookRoute;
   /**
-   * Declarative apps: how a delivery becomes one of this app's events. The
-   * first row whose 'when' holds emits; a delivery no row matches is dropped.
+   * Declarative plug-ins: how a delivery becomes one of this plug-in's events.
+   * The first row whose 'when' holds emits; a delivery no row matches is
+   * dropped.
    */
   events?: WebhookEvent[];
   /**
-   * Declarative apps: deliveries that say what state a connection is in at the
-   * vendor. The first row whose 'when' holds sets it.
+   * Declarative plug-ins: deliveries that say what state a connection is in at
+   * the vendor. The first row whose 'when' holds sets it.
    */
   status?: WebhookStatus[];
 }
@@ -656,7 +658,7 @@ export interface WebhookRoute {
    */
   header?: string;
   /**
-   * A static connection this app declares.
+   * A static connection this plug-in declares.
    */
   connection: Identifier;
   /**
@@ -667,8 +669,8 @@ export interface WebhookRoute {
 }
 
 /**
- * An interval at which Initiative calls the app's schedule hook, once for each
- * community that installed it, with when the call last succeeded there.
+ * An interval at which Initiative calls the plug-in's schedule hook, once for
+ * each community that installed it, with when the call last succeeded there.
  */
 export interface Schedule {
   /**
@@ -683,20 +685,20 @@ export interface Schedule {
 }
 
 /**
- * Namespaced under the app's own service id — 'app.<public_id>.<name>'. The
- * prefix is checked against the declaring registration at ingress.
+ * Namespaced under the plug-in's own service id — 'plugin.<public_id>.<name>'.
+ * The prefix is checked against the declaring registration at ingress.
  */
 export type NamespacedId = string;
 
 /**
- * 'apps:<public_id>': permission to call another app's public endpoints through
- * the deployment, as this community or as one of its members. Not one of the
- * fixed scopes: the family is open, one per app, and the public id after the
- * prefix is the app being called. The deployment never lets an app address
- * another directly; the call goes through it, and the app called is handed its
- * own references for whoever the call is for.
+ * 'plugins:<public_id>': permission to call another plug-in's public endpoints
+ * through the deployment, as this community or as one of its members. Not one
+ * of the fixed scopes: the family is open, one per plug-in, and the public id
+ * after the prefix is the plug-in being called. The deployment never lets a
+ * plug-in address another directly; the call goes through it, and the plug-in
+ * called is handed its own references for whoever the call is for.
  */
-export type AppScope = `apps:${string}`;
+export type PluginScope = `plugins:${string}`;
 
 export interface Endpoint {
   id: NamespacedId;
@@ -718,7 +720,7 @@ export interface Endpoint {
    */
   returns?: EndpointReturn[];
   /**
-   * Where a consumer that groups an app's endpoints should file this one.
+   * Where a consumer that groups a plug-in's endpoints should file this one.
    * Opaque here: the grouping is the consumer's, and an endpoint that says
    * nothing sits in the flat list.
    */
@@ -731,7 +733,7 @@ export interface Endpoint {
   needs_subject?: Identifier;
   /**
    * 'read' and 'write' are called through the deployment and answer in place;
-   * 'emit' travels the other way — the app posts it to a subscriber that
+   * 'emit' travels the other way — the plug-in posts it to a subscriber that
    * registered a URL, so it carries no parameters and nothing to gate.
    */
   direction: Direction;
@@ -742,7 +744,7 @@ export interface Endpoint {
   /**
    * Whose credential the call runs on, best first. Read and write only. An
    * endpoint offering only 'member' refuses when that member has connected
-   * nothing, rather than quietly acting as the app instead.
+   * nothing, rather than quietly acting as the plug-in instead.
    */
   actors?: ActorKind[];
   /**
@@ -752,13 +754,13 @@ export interface Endpoint {
    */
   admin_only?: boolean;
   /**
-   * Read and write only. Other apps may call this endpoint through the
-   * deployment, when the community has let them use this app ('apps:<your
-   * public id>'). A caller acts as the community or as one of its members, and
-   * `actors` says which of the two this endpoint takes: one that names neither
-   * is not callable this way. A write endpoint is reachable only like this; a
-   * widget binds reads alone. Absent means only the deployment's own surfaces
-   * reach it.
+   * Read and write only. Other plug-ins may call this endpoint through the
+   * deployment, when the community has let them use this plug-in
+   * ('plugins:<your public id>'). A caller acts as the community or as one of
+   * its members, and `actors` says which of the two this endpoint takes: one
+   * that names neither is not callable this way. A write endpoint is reachable
+   * only like this; a widget binds reads alone. Absent means only the
+   * deployment's own surfaces reach it.
    */
   public?: boolean;
   requires?: Requires;
@@ -780,24 +782,24 @@ export interface Endpoint {
    */
   unavailable?: Identifier[];
   /**
-   * Declarative apps: the one call that answers this endpoint. Not beside
+   * Declarative plug-ins: the one call that answers this endpoint. Not beside
    * 'steps'.
    */
   request?: VendorRequest;
   /**
-   * Declarative apps: up to 3 calls made in order, each able to read the
+   * Declarative plug-ins: up to 3 calls made in order, each able to read the
    * answers of the ones before it. Not beside 'request'.
    */
   steps?: RequestStep[];
   /**
-   * Declarative apps: the endpoint's answer, from 'response' (the last call's
-   * answer) and 'steps': an object of its declared returns, or {"unavailable":
-   * "<code>"} naming one of its codes.
+   * Declarative plug-ins: the endpoint's answer, from 'response' (the last
+   * call's answer) and 'steps': an object of its declared returns, or
+   * {"unavailable": "<code>"} naming one of its codes.
    */
   map?: Expression;
   /**
-   * Declarative apps: vendor answers this endpoint gives its own meaning, tried
-   * on every answer before the defaults. The defaults: 401 and 403 are
+   * Declarative plug-ins: vendor answers this endpoint gives its own meaning,
+   * tried on every answer before the defaults. The defaults: 401 and 403 are
    * not-authorized, 404 not-found, 400, 422 and any other 4xx invalid, and 429,
    * 3xx and 5xx transient.
    */
@@ -859,11 +861,11 @@ export interface BundledDashboard {
   /**
    * This dashboard's own catalog id — publisher-assigned, immutable, never
    * reused. It becomes a listing of its own, so this is a real catalog identity
-   * and not the app's.
+   * and not the plug-in's.
    */
   uid: string;
   /**
-   * '<publisher>.<slug>', and not the app's own — a bundled dashboard is a
+   * '<publisher>.<slug>', and not the plug-in's own — a bundled dashboard is a
    * separate listing.
    */
   public_id: string;
@@ -879,7 +881,8 @@ export interface BundledDashboardWidget {
   id?: Identifier;
   /**
    * One of this manifest's own widget ids — bare, with no uid. The platform
-   * stamps the app's uid on when it publishes, so the two can never disagree.
+   * stamps the plug-in's uid on when it publishes, so the two can never
+   * disagree.
    */
   type: Identifier;
   title?: string;
@@ -902,15 +905,15 @@ export interface BundledDashboardWidget {
 /**
  * Which of this endpoint's returns identify the thing it touched. A consumer
  * keeps a change an automation made from firing that automation again, and for
- * an app there was no key — so guessing would silently drop a fire somebody was
- * waiting on, and a rate cap was the only guard. Declare the SAME kind and key
- * on the write and on the emission about it, and the two produce the same
+ * a plug-in there was no key — so guessing would silently drop a fire somebody
+ * was waiting on, and a rate cap was the only guard. Declare the SAME kind and
+ * key on the write and on the emission about it, and the two produce the same
  * address.
  */
 export interface EndpointIdentity {
   /**
    * Your own word for what sort of thing this is ('issue'). Namespaced by your
-   * public id downstream, because two apps declaring the same kind mean two
+   * public id downstream, because two plug-ins declaring the same kind mean two
    * different things.
    */
   kind: Identifier;
@@ -940,10 +943,10 @@ export interface EndpointIdentity {
 export type Expression = string;
 
 /**
- * A host a declarative app calls, in lowercase: exact ('api.github.com'), or
- * with one leading '*.' that stands for exactly one label ('*.myshopify.com').
- * No scheme, port or path: every call is https on port 443, and goes only to a
- * public address.
+ * A host a declarative plug-in calls, in lowercase: exact ('api.github.com'),
+ * or with one leading '*.' that stands for exactly one label
+ * ('*.myshopify.com'). No scheme, port or path: every call is https on port
+ * 443, and goes only to a public address.
  */
 export type Host = string;
 
@@ -952,7 +955,7 @@ export type HeaderName = string;
 export type QueryName = string;
 
 /**
- * How Initiative puts a connection's credential on a declarative app's
+ * How Initiative puts a connection's credential on a declarative plug-in's
  * requests: one header, holding the prefix and the token joined by a space.
  * Absent: 'Authorization: Bearer <token>'.
  */
@@ -965,15 +968,16 @@ export interface VendorAuth {
 }
 
 /**
- * One call Initiative makes to the vendor for a declarative app, rendered from
- * expressions. Initiative adds the credential itself, as 'auth' says, and
+ * One call Initiative makes to the vendor for a declarative plug-in, rendered
+ * from expressions. Initiative adds the credential itself, as 'auth' says, and
  * follows no redirect.
  */
 export interface VendorRequest {
   method: HttpMethod;
   /**
    * The address, as an expression answering a string: https, on one of the
-   * app's hosts. Query parameters may be written into it or given in 'query'.
+   * plug-in's hosts. Query parameters may be written into it or given in
+   * 'query'.
    */
   url: Expression;
   /**
@@ -1060,7 +1064,7 @@ export interface PageNumberPaging {
 
 /**
  * The address in the Link header's rel="next", followed until there is none. It
- * must be https on one of the app's hosts.
+ * must be https on one of the plug-in's hosts.
  */
 export interface LinkHeaderPaging {
   kind: "link_header";
@@ -1129,8 +1133,8 @@ export interface ErrorRule {
 }
 
 /**
- * A declarative app's after_connect: a request, or up to 3 steps, made with the
- * access token just obtained, and the answers mapped to what the hook would
+ * A declarative plug-in's after_connect: a request, or up to 3 steps, made with
+ * the access token just obtained, and the answers mapped to what the hook would
  * answer. 'params' holds the flow's own parameters, such as the installation_id
  * an install page returned.
  */
@@ -1161,7 +1165,7 @@ export interface AfterConnect {
 }
 
 /**
- * Declarative apps: a request Initiative makes on an interval, with this
+ * Declarative plug-ins: a request Initiative makes on an interval, with this
  * connection's credential, to learn whether the connection still works. A state
  * other than 'ok' is reported once two answers in a row give it.
  */
@@ -1222,7 +1226,7 @@ export interface WebhookStatus {
    */
   when: Expression;
   /**
-   * A connection this app declares.
+   * A connection this plug-in declares.
    */
   connection: Identifier;
   /**
@@ -1232,19 +1236,19 @@ export interface WebhookStatus {
 }
 
 /**
- * What an app declares it can do. An app is a container, which names its
+ * What a plug-in declares it can do. A plug-in is a container, which names its
  * `service` and answers Initiative's calls, or declarative, which names its
  * `hosts` and no service, and whose endpoints, connection checks and webhook
  * events Initiative runs itself from the requests and JSONata expressions
- * written here; one app is never both. This is the 'definition' field of the
- * document served at /.well-known/initiative-app.json, NOT that whole document:
- * a registrar also requires protocol_version, public_id and kind alongside it,
- * and refuses a definition served bare. Generated from the platform's own
- * validator vocabulary. A manifest that satisfies this schema is well-formed,
- * not necessarily acceptable. Cross-references (the endpoint a widget binds, a
- * requires term's connection, an endpoint's service prefix), the
- * direction-specific rules on an endpoint, the features/blocks cross-check in
- * both directions, UTF-8 byte-size caps, the rules tying a connection's flow
+ * written here; one plug-in is never both. This is the 'definition' field of
+ * the document served at /.well-known/initiative-plugin.json, NOT that whole
+ * document: a registrar also requires protocol_version, public_id and kind
+ * alongside it, and refuses a definition served bare. Generated from the
+ * platform's own validator vocabulary. A manifest that satisfies this schema is
+ * well-formed, not necessarily acceptable. Cross-references (the endpoint a
+ * widget binds, a requires term's connection, an endpoint's service prefix),
+ * the direction-specific rules on an endpoint, the features/blocks cross-check
+ * in both directions, UTF-8 byte-size caps, the rules tying a connection's flow
  * and token to its scope and fields, what a webhooks block names, what a vendor
  * setup writes to, whether every expression parses, what a declarative request
  * and its steps name, and the bounds and unique ids of schedules are enforced
@@ -1252,52 +1256,53 @@ export interface WebhookStatus {
  */
 export interface Manifest {
   /**
-   * The kind every app manifest has, container or declarative: a declarative
-   * app is one with no 'service' block.
+   * The kind every plug-in manifest has, container or declarative: a
+   * declarative plug-in is one with no 'service' block.
    */
-  app_kind: "service";
+  plugin_kind: "service";
   /**
-   * A container app's service, which Initiative calls. Absent for a declarative
-   * app, whose public id is its listing's.
+   * A container plug-in's service, which Initiative calls. Absent for a
+   * declarative plug-in, whose public id is its listing's.
    */
   service?: {
     /**
      * '<publisher>.<slug>'. The name the deployment's registration is matched
-     * by, and the namespace this app's events are emitted under.
+     * by, and the namespace this plug-in's events are emitted under.
      */
     public_id: string;
     protocol?: Protocol;
     /**
-     * The scopes this app asks a community to grant: what its installation and
-     * member tokens act with. The fixed scopes, and 'apps:<public_id>' for each
-     * app this one calls (at most 24 of those). The community grants some or
-     * all of them when it installs the app, and a token never carries more than
-     * was granted. Writing implies reading. Absent means none.
+     * The scopes this plug-in asks a community to grant: what its installation
+     * and member tokens act with. The fixed scopes, and 'plugins:<public_id>'
+     * for each plug-in this one calls (at most 24 of those). The community
+     * grants some or all of them when it installs the plug-in, and a token
+     * never carries more than was granted. Writing implies reading. Absent
+     * means none.
      */
-    scopes?: Array<Scope | AppScope>;
+    scopes?: Array<Scope | PluginScope>;
   };
   /**
-   * What this app contributes. Cross-checked against the blocks present in both
-   * directions: a feature with no block, or a block with no feature, is
+   * What this plug-in contributes. Cross-checked against the blocks present in
+   * both directions: a feature with no block, or a block with no feature, is
    * refused.
    */
   features: Feature[];
   default_name?: string;
   /**
-   * Declarative apps, which must name at least one: every host their requests,
-   * paging and links may reach. A container app names none.
+   * Declarative plug-ins, which must name at least one: every host their
+   * requests, paging and links may reach. A container plug-in names none.
    */
   hosts?: Host[];
   /**
-   * Declarative apps only.
+   * Declarative plug-ins only.
    */
   auth?: VendorAuth;
   vendor?: Vendor;
   connections?: Connection[];
   webhooks?: Webhooks;
   /**
-   * What Initiative calls the app's schedule hook for, and how often. At most
-   * 8.
+   * What Initiative calls the plug-in's schedule hook for, and how often. At
+   * most 8.
    */
   schedules?: Schedule[];
   endpoints?: Endpoint[];
@@ -1305,17 +1310,17 @@ export interface Manifest {
    * A read endpoint whose declared returns describe this community's standing
    * with your service — what it has used, what it is allowed. A deployment may
    * render them on the community's own settings page, beside its own figures.
-   * Whether it does is the deployment's decision and not this manifest's: an
-   * app the operator did not ship is declaring where it would like to appear,
-   * which is not the same as appearing.
+   * Whether it does is the deployment's decision and not this manifest's: a
+   * plug-in the operator did not ship is declaring where it would like to
+   * appear, which is not the same as appearing.
    */
   community_summary?: NamespacedId;
   widgets?: Widget[];
   embeds?: Embed[];
   /**
-   * Ready-made arrangements of this app's own widgets. Publishing the app
-   * publishes one ordinary dashboard listing per entry, offered to communities
-   * that install the app.
+   * Ready-made arrangements of this plug-in's own widgets. Publishing the
+   * plug-in publishes one ordinary dashboard listing per entry, offered to
+   * communities that install the plug-in.
    */
   dashboards?: BundledDashboard[];
 }

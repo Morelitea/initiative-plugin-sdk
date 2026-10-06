@@ -1,11 +1,11 @@
 /**
- * `initiative-app-sdk/widget`: what a widget module is handed and what it
+ * `initiative-plugin-sdk/widget`: what a widget module is handed and what it
  * returns.
  *
  * A widget is a TypeScript module exporting `render`:
  *
  * ```ts
- * import type { Scene, WidgetData } from "initiative-app-sdk/widget";
+ * import type { Scene, WidgetData } from "initiative-plugin-sdk/widget";
  * import type { openTickets } from "../endpoints.js";
  *
  * export function render(data: WidgetData<typeof openTickets>): Scene {
@@ -13,7 +13,7 @@
  * }
  * ```
  *
- * `initiative-app build` bundles it into one script with no imports, which
+ * `initiative-plugin build` bundles it into one script with no imports, which
  * Initiative runs in a sandbox with no host bindings: no network, no DOM, no
  * timers. What it returns is data describing a picture, which Initiative
  * draws and bounds.
@@ -39,7 +39,7 @@ type SingleKey<R> = Exclude<keyof R, ListKey<R>>;
  * declaration, as `defineEndpoint` gave it.
  */
 export interface WidgetData<E> {
-  source: "app";
+  source: "plugin";
   /** One entry per index across the endpoint's `list` returns, keyed by their names. */
   rows: Array<{ [K in ListKey<Returns<E>>]?: Scalar<TypeOf<Returns<E>[K]>> }>;
   /** The endpoint's single-valued returns, once. */

@@ -1,5 +1,5 @@
 /**
- * `initiative-app-sdk/testing`: a declarative app's requests and mappings,
+ * `initiative-plugin-sdk/testing`: a declarative plug-in's requests and mappings,
  * run against recorded vendor answers, with no server and no network.
  *
  * Each runner renders the requests the way Initiative makes them (method,
@@ -10,24 +10,24 @@
  * - `{ result }`: the mapped answer;
  * - `{ unavailable, detail? }`: a code, from an `errors` rule, the defaults,
  *   the map itself, `range-too-large` from paging, or `mapping-failed` when an
- *   expression fails or a rendered address is not https on one of the app's
+ *   expression fails or a rendered address is not https on one of the plug-in's
  *   hosts (`detail` says which);
  * - `{ transient: true }`: a passing failure, which Initiative answers as one
  *   to retry;
  * - `{ refused }`: an `after_connect` that refused the connection.
  *
  * A rendered request carries no credential: Initiative adds the one its
- * `connection` names, as the app's `auth` says. A predicate (`when`, `more`,
+ * `connection` names, as the plug-in's `auth` says. A predicate (`when`, `more`,
  * `refuse_when`) holds when JSONata's `$boolean` of its answer is true.
  *
- * A run fails, rather than answering, on a mistake in the test or the app: a
+ * A run fails, rather than answering, on a mistake in the test or the plug-in: a
  * request with no recorded response left for it, a recorded response nothing
  * asked for, or a mapped answer that does not fit the declared returns.
  */
 
 import type { ConnectionState, ErrorRule, StatusMatch, VendorRequest } from "./contract.js";
 import { PLATFORM_CODES } from "./contract.js";
-import type { AnyApp, ReturnSpec } from "./define.js";
+import type { AnyPlugin, ReturnSpec } from "./define.js";
 import { evaluate, ExpressionError } from "./expression.js";
 
 export { evaluate, ExpressionError, parseExpression } from "./expression.js";
@@ -196,7 +196,7 @@ async function render(
   if (!onHost(url, context.hosts)) {
     throw new Outcome({
       unavailable: "mapping-failed",
-      detail: `${where}: ${url} is not https on one of the app's hosts (${context.hosts.join(", ")})`,
+      detail: `${where}: ${url} is not https on one of the plug-in's hosts (${context.hosts.join(", ")})`,
     });
   }
 
@@ -305,16 +305,16 @@ function fits(answer: unknown, returns: Record<string, ReturnSpec> | undefined, 
  * on whose credential, is Initiative's to decide.
  */
 export async function runEndpoint(
-  app: AnyApp,
+  plugin: AnyPlugin,
   name: string,
   call: Recorded & {
     params?: Record<string, unknown>;
     connections?: Record<string, Record<string, unknown>>;
   }
 ): Promise<Run<Record<string, unknown>>> {
-  const endpoint = app.endpoints?.[name];
-  if (!endpoint || !("map" in endpoint)) throw new TypeError(`'${name}' is not a declarative endpoint of this app`);
-  const context = new Context(app.hosts ?? [], call, endpoint.errors ?? []);
+  const endpoint = plugin.endpoints?.[name];
+  if (!endpoint || !("map" in endpoint)) throw new TypeError(`'${name}' is not a declarative endpoint of this plug-in`);
+  const context = new Context(plugin.hosts ?? [], call, endpoint.errors ?? []);
   return context.run<Record<string, unknown>>(async () => {
     const given = call.connections ?? {};
     const required = [...(endpoint.requires?.all_of ?? []), ...(endpoint.requires?.any_of ?? [])];
@@ -352,13 +352,13 @@ export async function runEndpoint(
  * the last answer as `response` and, with steps, each one's as `steps.<name>`.
  */
 export async function runAfterConnect(
-  app: AnyApp,
+  plugin: AnyPlugin,
   connection: string,
   call: Recorded & { params?: Record<string, string> }
 ): Promise<Run<{ values?: Record<string, unknown>; account_label?: string }>> {
-  const after = app.connections?.[connection]?.flow?.after_connect;
+  const after = plugin.connections?.[connection]?.flow?.after_connect;
   if (typeof after !== "object") throw new TypeError(`'${connection}' has no declarative after_connect`);
-  const context = new Context(app.hosts ?? [], call, []);
+  const context = new Context(plugin.hosts ?? [], call, []);
   return context.run<{ values?: Record<string, unknown>; account_label?: string }>(async () => {
     const base = { params: call.params ?? {}, now: context.now };
     const steps = after.steps ?? [{ name: "", request: after.request! }];
@@ -384,13 +384,13 @@ export async function runAfterConnect(
 
 /** A connection's health check: its request made with the connection's non-secret `fields`, and the state it reads. */
 export async function runHealth(
-  app: AnyApp,
+  plugin: AnyPlugin,
   connection: string,
   call: Recorded & { fields?: Record<string, unknown> }
 ): Promise<Run<ConnectionState>> {
-  const health = app.connections?.[connection]?.health;
+  const health = plugin.connections?.[connection]?.health;
   if (!health) throw new TypeError(`'${connection}' declares no health check`);
-  const context = new Context(app.hosts ?? [], call, null);
+  const context = new Context(plugin.hosts ?? [], call, null);
   return context.run(async () => {
     const document = { params: {}, connection: call.fields ?? {}, now: context.now };
     const response = await perform(health.request, document, context, "health/request");
@@ -410,14 +410,14 @@ export interface WebhookRun {
 }
 
 /**
- * One webhook delivery, as a declarative app maps it: the event the first
+ * One webhook delivery, as a declarative plug-in maps it: the event the first
  * matching `events` row emits (by the emit endpoint's key, its payload held to
  * that endpoint's returns), and the state the first matching `status` row
  * sets. A delivery nothing matches answers neither. An expression that fails
  * throws {@link ExpressionError}.
  */
 export async function runWebhook(
-  app: AnyApp,
+  plugin: AnyPlugin,
   delivery: {
     headers?: Record<string, string>;
     payload: unknown;
@@ -436,13 +436,13 @@ export async function runWebhook(
   const holds = async (expression: string) =>
     (await evaluate("$boolean($)", await evaluate(expression, document, { now: clock }))) === true;
   const out: WebhookRun = {};
-  for (const row of app.webhooks?.events ?? []) {
+  for (const row of plugin.webhooks?.events ?? []) {
     if (!(await holds(row.when))) continue;
     const payload = await evaluate(row.map, document, { now: clock });
-    out.event = { emit: row.emit, payload: fits(payload, app.endpoints?.[row.emit]?.returns, `the ${row.emit} event`) };
+    out.event = { emit: row.emit, payload: fits(payload, plugin.endpoints?.[row.emit]?.returns, `the ${row.emit} event`) };
     break;
   }
-  for (const row of app.webhooks?.status ?? []) {
+  for (const row of plugin.webhooks?.status ?? []) {
     if (await holds(row.when)) {
       out.status = { connection: row.connection, state: row.state };
       break;

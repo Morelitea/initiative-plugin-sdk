@@ -1,20 +1,20 @@
 /**
- * Verifying the tokens Initiative signs when it reaches the app.
+ * Verifying the tokens Initiative signs when it reaches the plug-in.
  *
  * Both kinds are RS256 JWTs signed with the deployment's key and published in
- * its JWKS at `/api/v1/app-platform/jwks.json`:
+ * its JWKS at `/api/v1/plugin-platform/jwks.json`:
  *
- * - **Context token**, on every call to the app (`Authorization: Bearer …`).
+ * - **Context token**, on every call to the plug-in (`Authorization: Bearer …`).
  *   Scope `endpoint` is a call to one endpoint, named by `endpoint_id`; scope
- *   `lifecycle` is a call to one hook, named by `hook`. When another app made
- *   the call through Initiative it also carries `act` (that app), `actor`,
+ *   `lifecycle` is a call to one hook, named by `hook`. When another plug-in made
+ *   the call through Initiative it also carries `act` (that plug-in), `actor`,
  *   `member` and, when the caller was confined to one, `initiative_id`.
- * - **Handoff token**, when a member opens one of the app's surfaces. It names
+ * - **Handoff token**, when a member opens one of the plug-in's surfaces. It names
  *   the member (`sub`), the surface, and the initiative it was opened in. It is
  *   for one use.
  *
  * Each is checked the same way: the `kid` against the deployment's JWKS, the
- * signature, `iss` = `initiative`, `aud` = `initiative-app:<public id>`, and
+ * signature, `iss` = `initiative`, `aud` = `initiative-plugin:<public id>`, and
  * `exp`/`iat` against the clock with a small leeway.
  */
 
@@ -25,14 +25,14 @@ import { ACTOR_KINDS, type ActorKind } from "./contract.js";
 /**
  * What a context token authorizes.
  *
- * `endpoint` covers every call to an endpoint your app declares; the id says
+ * `endpoint` covers every call to an endpoint your plug-in declares; the id says
  * which. `lifecycle` is Initiative calling one of your hooks about an
  * installation; `hook` says which.
  */
 export type ContextScope = "endpoint" | "lifecycle";
 
 /** Where the deployment publishes its verification keys. */
-export const JWKS_PATH = "/api/v1/app-platform/jwks.json";
+export const JWKS_PATH = "/api/v1/plugin-platform/jwks.json";
 
 /** How long a fetched key set is reused before a refetch is considered. */
 export const JWKS_CACHE_SECONDS = 300;
@@ -58,7 +58,7 @@ export interface InitiativeTokenClaims {
    */
   community_ref: string;
   /** The installation within that community. */
-  app_install_id: number;
+  plugin_install_id: number;
 }
 
 export interface ContextClaims extends InitiativeTokenClaims {
@@ -70,30 +70,30 @@ export interface ContextClaims extends InitiativeTokenClaims {
   /**
    * Connection id → the opaque handle you ask Initiative for an access token
    * with. Present only where the call depends on a connection. On a call from
-   * another app it holds only what the actor may use: the member's own
+   * another plug-in it holds only what the actor may use: the member's own
    * connections for a `member` call, the community's for an `installation`
    * one.
    */
   connection_refs?: Record<string, string>;
   /**
-   * Present when another app made this call through Initiative: that app's
+   * Present when another plug-in made this call through Initiative: that plug-in's
    * public id, as `act.sub` (RFC 8693 §4.1). Absent when Initiative itself
    * called, for a widget.
    */
   act?: { sub: string };
   /**
-   * On a call from another app: whose behalf it is on. `installation` is the
+   * On a call from another plug-in: whose behalf it is on. `installation` is the
    * community; `member` is the member named in {@link ContextClaims.member}.
    */
   actor?: ActorKind;
   /**
    * On a `member` call: the member, by the reference your installation knows
-   * them by. The calling app never sees it.
+   * them by. The calling plug-in never sees it.
    */
   member?: string;
   /**
-   * On a call from another app whose token is confined to one initiative: that
-   * initiative. Your app is placed there too.
+   * On a call from another plug-in whose token is confined to one initiative: that
+   * initiative. Your plug-in is placed there too.
    */
   initiative_id?: number;
 }
@@ -113,7 +113,7 @@ export class ContextTokenError extends Error {}
 
 /** The audience a token for `publicId` names. */
 export function audienceFor(publicId: string): string {
-  return `initiative-app:${publicId}`;
+  return `initiative-plugin:${publicId}`;
 }
 
 interface Jwk {
@@ -199,7 +199,7 @@ function missing(document: string, keys: Map<string, unknown>, kid: string): nev
 }
 
 export interface VerifyOptions {
-  /** Your app's public id. The audience must name it. */
+  /** Your plug-in's public id. The audience must name it. */
   publicId: string;
   /** The deployment, for key lookup: its origin or its API base. */
   baseUrl: string;
@@ -226,7 +226,7 @@ export async function verifyContextToken(
 }
 
 /**
- * The claims naming another app's call, checked for shape: an `act` names the
+ * The claims naming another plug-in's call, checked for shape: an `act` names the
  * caller, an `actor` is one of the two kinds, and a `member` call names its
  * member.
  */
@@ -239,7 +239,7 @@ function checkCaller(claims: ContextClaims): void {
       typeof (act as { sub?: unknown }).sub !== "string" ||
       !(act as { sub: string }).sub
     ) {
-      throw new ContextTokenError("act names no calling app");
+      throw new ContextTokenError("act names no calling plug-in");
     }
   }
   if (claims.actor !== undefined && !ACTOR_KINDS.includes(claims.actor)) {

@@ -1,8 +1,8 @@
 /** A project's open issues, with the closed ones beneath. */
 
-import type { Scene, WidgetData } from "initiative-app-sdk/widget";
+import type { Scene, WidgetData } from "initiative-plugin-sdk/widget";
 
-import type { issueCounts } from "../app.js";
+import type { issueCounts } from "../plugin.js";
 
 export function render(data: WidgetData<typeof issueCounts>): Scene {
   const { opened, closed } = data.values;

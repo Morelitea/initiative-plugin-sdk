@@ -2,11 +2,11 @@
 /**
  * Generate everything derived from `manifest.contract.json`.
  *
- * The contract is the one hand-authored statement of what an app manifest may
+ * The contract is the one hand-authored statement of what a plug-in manifest may
  * say: the vocabulary (enums, ladders, caps, character sets) and the shape (each
  * object's fields). Two things are generated from it and committed beside it:
  *
- * - `schemas/app-manifest.json` — the JSON Schema an author validates against.
+ * - `schemas/plugin-manifest.json` — the JSON Schema an author validates against.
  * - `src/contract.ts` — the same vocabulary and every object's shape as
  *   TypeScript, so no contract term exists without its type and the SDK's
  *   types cannot disagree with the schema it ships.
@@ -68,7 +68,7 @@ function charClass(name) {
 
 function pattern(name, form, prefix = "") {
   const cls = charClass(name);
-  // A literal prefix ahead of the class, such as a scope family's `apps:`.
+  // A literal prefix ahead of the class, such as a scope family's `plugins:`.
   // Letters and colons only, so it needs no escaping inside a pattern.
   for (const character of prefix) {
     if (!"abcdefghijklmnopqrstuvwxyz:".includes(character)) {
@@ -148,7 +148,7 @@ const plural = (name) => (/[^aeiou]y$/.test(name) ? `${name.slice(0, -1)}ies` : 
 function buildTypes() {
   const lines = [
     "/**",
-    " * The app contract, as TypeScript.",
+    " * The plug-in contract, as TypeScript.",
     " *",
     " * GENERATED from `manifest.contract.json` by `scripts/generate.mjs`. Do not",
     " * edit it: change the contract and run `npm run generate`.",
@@ -238,7 +238,7 @@ function declaration(name, node) {
 // --- write or check --------------------------------------------------------
 
 const outputs = [
-  [join(root, "schemas", "app-manifest.json"), JSON.stringify(buildSchema(), null, 2) + "\n"],
+  [join(root, "schemas", "plugin-manifest.json"), JSON.stringify(buildSchema(), null, 2) + "\n"],
   [join(root, "src", "contract.ts"), buildTypes()],
 ];
 

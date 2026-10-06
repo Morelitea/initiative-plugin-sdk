@@ -1,9 +1,9 @@
-/** An app declaring one of everything, recording what each handler was handed. */
+/** A plug-in declaring one of everything, recording what each handler was handed. */
 
-import { defineApp, defineEndpoint, type Call } from "../../src/manifest.js";
+import { definePlugin, defineEndpoint, type Call } from "../../src/manifest.js";
 import { EndpointError } from "../../src/server.js";
 
-export function trackerApp() {
+export function trackerPlugin() {
   const seen: Array<{ name: string; call: Call & Record<string, unknown> }> = [];
   const record = (name: string, call: Call) => seen.push({ name, call: call as Call & Record<string, unknown> });
 
@@ -55,11 +55,11 @@ export function trackerApp() {
     identity: { kind: "ticket", key: ["number"] },
   });
 
-  const app = defineApp({
+  const plugin = definePlugin({
     publicId: "acme.tracker",
     uid: "K7M2QX8N4TVB9C",
     name: "Tracker",
-    scopes: ["projects:read", "apps:acme.github"],
+    scopes: ["projects:read", "plugins:acme.github"],
     vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
     connections: {
       account: {
@@ -130,11 +130,11 @@ export function trackerApp() {
       },
     ],
   });
-  return { app, seen };
+  return { plugin, seen };
 }
 
-/** A declarative app using each of its terms: no handler, hook or service. */
-export function issuesApp() {
+/** A declarative plug-in using each of its terms: no handler, hook or service. */
+export function issuesPlugin() {
   const api = (path: string) => JSON.stringify(`https://api.tracker.example${path}`);
 
   const openIssues = defineEndpoint({
@@ -221,7 +221,7 @@ export function issuesApp() {
     identity: { kind: "issue", key: ["number"] },
   });
 
-  return defineApp({
+  return definePlugin({
     publicId: "acme.issues",
     uid: "K7M2QX8N4TVB9F",
     name: "Issues",

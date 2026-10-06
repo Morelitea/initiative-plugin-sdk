@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * Generate the typed client for Initiative's app API.
+ * Generate the typed client for Initiative's plug-in API.
  *
- * Initiative describes every route an installed app may call in its own
+ * Initiative describes every route an installed plug-in may call in its own
  * OpenAPI document. This reads that document straight from Initiative and
- * writes `src/app-api.generated.ts`, nothing else:
+ * writes `src/plugin-api.generated.ts`, nothing else:
  *
- * - `AppApiSchemas`, every schema the operations reach, and
- *   `AppApiOperations`, each operation's arguments by where they go and its
+ * - `PluginApiSchemas`, every schema the operations reach, and
+ *   `PluginApiOperations`, each operation's arguments by where they go and its
  *   answer, as TypeScript by the emitter the contract's types use
  *   (`ts-emit.mjs`);
  * - the operations table (`{ method, path, scope }` per operation id, with
- *   `json` naming the query parameters sent as JSON) and the `AppApi`
+ *   `json` naming the query parameters sent as JSON) and the `PluginApi`
  *   methods `client.api` exposes.
  *
  * The document itself is never stored; the generated file's header names the
  * Initiative it came from. Regenerate when Initiative releases.
  *
- *   node scripts/generate-app-api.mjs --checkout ../initiative   # a local checkout (uv)
- *   node scripts/generate-app-api.mjs --release v0.75.0          # a release's attached asset
- *   node scripts/generate-app-api.mjs --url https://initiative.example.com
+ *   node scripts/generate-plugin-api.mjs --checkout ../initiative   # a local checkout (uv)
+ *   node scripts/generate-plugin-api.mjs --release v0.75.0          # a release's attached asset
+ *   node scripts/generate-plugin-api.mjs --url https://initiative.example.com
  */
 
 import { spawnSync } from "node:child_process";
@@ -30,12 +30,12 @@ import { fileURLToPath } from "node:url";
 import { emitter } from "./ts-emit.mjs";
 
 const RELEASES = "https://github.com/Morelitea/initiative/releases/download";
-const ASSET = "initiative-app-api.json";
+const ASSET = "initiative-plugin-api.json";
 const SERVER = "/api/v1/c/0";
 const METHODS = ["get", "put", "post", "delete", "patch"];
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const output = join(root, "src", "app-api.generated.ts");
+const output = join(root, "src", "plugin-api.generated.ts");
 
 function fail(message) {
   console.error(message);
@@ -58,10 +58,10 @@ async function download(url) {
 /** The document and where it came from. */
 async function source(argv) {
   const [flag, value, ...rest] = argv;
-  if (!value || rest.length) fail("usage: generate-app-api.mjs --checkout <path> | --release <vX.Y.Z> | --url <base>");
+  if (!value || rest.length) fail("usage: generate-plugin-api.mjs --checkout <path> | --release <vX.Y.Z> | --url <base>");
   if (flag === "--checkout") {
     const checkout = resolve(value);
-    const text = run("uv", ["run", "python", "scripts/export_openapi.py", "--app", "-"], {
+    const text = run("uv", ["run", "python", "scripts/export_openapi.py", "--plugin", "-"], {
       cwd: join(checkout, "backend"),
       stdio: ["ignore", "pipe", "inherit"],
     });
@@ -74,7 +74,7 @@ async function source(argv) {
   }
   if (flag === "--url") {
     const base = value.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
-    return { text: await download(`${base}/api/v1/app-platform/openapi.json`), from: base };
+    return { text: await download(`${base}/api/v1/plugin-platform/openapi.json`), from: base };
   }
   fail(`unknown source ${flag}: use --checkout, --release or --url`);
 }
@@ -95,12 +95,12 @@ function valueLiteral(value) {
 /** A description's first paragraph, as one line. */
 const firstParagraph = (text) => text.split(/\n\s*\n/)[0].replace(/\s+/g, " ").replace(/``/g, "`").trim();
 
-/** A schema reference is a member of `AppApiSchemas`. */
+/** A schema reference is a member of `PluginApiSchemas`. */
 const { doc, objectType, tsType } = emitter({
   named: (node) => {
     if (node.$ref === undefined) return undefined;
     if (!node.$ref.startsWith(SCHEMAS)) fail(`cannot follow ${node.$ref}`);
-    return `AppApiSchemas[${quote(node.$ref.slice(SCHEMAS.length))}]`;
+    return `PluginApiSchemas[${quote(node.$ref.slice(SCHEMAS.length))}]`;
   },
   prose: firstParagraph,
 });
@@ -132,7 +132,7 @@ function parameterObject(id, parameters) {
   };
 }
 
-/** The types, the operations table and the `AppApi` class, from the document. */
+/** The types, the operations table and the `PluginApi` class, from the document. */
 function emit(spec) {
   const schemas = spec.components?.schemas ?? {};
   const shapes = [];
@@ -144,8 +144,8 @@ function emit(spec) {
       const operation = item[verb];
       if (!operation) continue;
       const id = operation.operationId;
-      const scope = operation["x-app-scope"];
-      if (!id || !scope) fail(`${verb.toUpperCase()} ${path} has no operationId or x-app-scope`);
+      const scope = operation["x-plugin-scope"];
+      if (!id || !scope) fail(`${verb.toUpperCase()} ${path} has no operationId or x-plugin-scope`);
       const name = camel(id);
       if (names.has(name)) fail(`${id} and ${names.get(name)} are both ${name}`);
       names.set(name, id);
@@ -159,7 +159,7 @@ function emit(spec) {
 
       const shape = [`  ${id}: {`];
       const fields = [];
-      const op = `AppApiOperations[${quote(id)}]`;
+      const op = `PluginApiOperations[${quote(id)}]`;
       if (inPath.length) {
         shape.push(`    path: ${objectType(parameterObject(id, inPath), "    ")};`);
         fields.push(`path: ${op}["path"]`);
@@ -204,27 +204,27 @@ function emit(spec) {
       );
     }
   }
-  return `/** Initiative's schemas, by name: \`AppApiSchemas["TaskRead"]\`. */
-export interface AppApiSchemas ${objectType({ properties: schemas, required: Object.keys(schemas) }, "")}
+  return `/** Initiative's schemas, by name: \`PluginApiSchemas["TaskRead"]\`. */
+export interface PluginApiSchemas ${objectType({ properties: schemas, required: Object.keys(schemas) }, "")}
 
 /** Each operation's arguments, by where they go, and its answer. */
-export interface AppApiOperations {
+export interface PluginApiOperations {
 ${shapes.join("\n")}
 }
 
 /**
- * Each operation an app may call: its method, its path after \`${SERVER}\`, the
+ * Each operation a plug-in may call: its method, its path after \`${SERVER}\`, the
  * scope it needs, and the query parameters it takes as JSON.
  */
-export const appApiOperations = {
+export const pluginApiOperations = {
 ${table.join("\n")}
-} as const satisfies Record<string, AppApiOperation>;
+} as const satisfies Record<string, PluginApiOperation>;
 
-export type AppApiOperationId = keyof typeof appApiOperations;
+export type PluginApiOperationId = keyof typeof pluginApiOperations;
 
-/** Every route Initiative's app API describes, as a typed method. A client's \`api\` is one. */
-export class AppApi {
-  constructor(private readonly call: (operation: AppApiOperationId, args?: AppApiArgs) => Promise<unknown>) {}
+/** Every route Initiative's plug-in API describes, as a typed method. A client's \`api\` is one. */
+export class PluginApi {
+  constructor(private readonly call: (operation: PluginApiOperationId, args?: PluginApiArgs) => Promise<unknown>) {}
 
 ${methods.join("\n\n")}
 }
@@ -237,20 +237,20 @@ const PREAMBLE = `import type { Scope } from "./contract.js";
  * The scope an operation needs: one scope; the scope an argument picks
  * (\`by\`); or any one of several, when Initiative checks each item (\`per\`).
  */
-export type AppApiScope =
+export type PluginApiScope =
   | Scope
   | { by: string; scopes: Readonly<Record<string, Scope>> }
   | { per: string; any_of: readonly Scope[] };
 
-export interface AppApiOperation {
+export interface PluginApiOperation {
   method: "GET" | "PUT" | "POST" | "DELETE" | "PATCH";
   path: string;
-  scope: AppApiScope;
+  scope: PluginApiScope;
   /** The query parameters sent as one JSON string each. */
   json?: readonly string[];
 }
 
-export interface AppApiArgs {
+export interface PluginApiArgs {
   path?: Record<string, string | number>;
   query?: Record<string, unknown>;
   body?: unknown;
@@ -262,14 +262,14 @@ let spec;
 try {
   spec = JSON.parse(text);
 } catch {
-  fail(`the app API document from ${from} is not JSON`);
+  fail(`the plug-in API document from ${from} is not JSON`);
 }
-if (spec.servers?.[0]?.url !== SERVER) fail(`expected the app API's server to be ${SERVER}, not ${spec.servers?.[0]?.url}`);
+if (spec.servers?.[0]?.url !== SERVER) fail(`expected the plug-in API's server to be ${SERVER}, not ${spec.servers?.[0]?.url}`);
 
 writeFileSync(
   output,
   `/**
- * Generated by scripts/generate-app-api.mjs from Initiative ${spec.info.version}'s app API
+ * Generated by scripts/generate-plugin-api.mjs from Initiative ${spec.info.version}'s plug-in API
  * (${from}). Do not edit: regenerate.
  */
 

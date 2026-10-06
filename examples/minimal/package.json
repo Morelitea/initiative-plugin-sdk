@@ -1,17 +1,17 @@
 {
-  "name": "initiative-app-minimal",
+  "name": "initiative-plugin-minimal",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "initiative-app build",
-    "pack": "initiative-app pack",
-    "dev": "initiative-app dev",
+    "build": "initiative-plugin build",
+    "pack": "initiative-plugin pack",
+    "dev": "initiative-plugin dev",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "initiative-app-sdk": "^1.7.0"
+    "initiative-plugin-sdk": "^1.7.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",

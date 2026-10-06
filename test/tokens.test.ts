@@ -17,13 +17,13 @@ import {
   verifyHandoffToken,
   verifyLifecycleToken,
 } from "../src/tokens.js";
-import { generateAppKeys, loadPrivateKey, signJwt } from "../src/keys.js";
+import { generatePluginKeys, loadPrivateKey, signJwt } from "../src/keys.js";
 
 const BASE = "https://initiative.example.com";
 const PUBLIC_ID = "acme.tracker";
 const NOW = 1_780_000_000;
 
-const platform = generateAppKeys({ alg: "RS256", kid: "platform-1" });
+const platform = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
 const signing = loadPrivateKey(platform.privateKeyPem, "platform-1");
 
 function jwksFetch(documents: Array<{ keys: unknown[] }> = [platform.jwks]) {
@@ -45,13 +45,13 @@ function claims(extra: Record<string, unknown> = {}): Record<string, unknown> {
     iat: NOW,
     exp: NOW + 60,
     community_ref: "gapp_abc",
-    app_install_id: 7,
+    plugin_install_id: 7,
     ...extra,
   };
 }
 
 const contextClaims = (extra: Record<string, unknown> = {}) =>
-  claims({ scope: "endpoint", endpoint_id: "app.acme.tracker.read", ...extra });
+  claims({ scope: "endpoint", endpoint_id: "plugin.acme.tracker.read", ...extra });
 
 const lifecycleClaims = (extra: Record<string, unknown> = {}) =>
   claims({ scope: "lifecycle", hook: "after_connect", ...extra });
@@ -78,21 +78,21 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 }
 
 describe("verifyContextToken", () => {
-  it("returns the claims of a token Initiative signed for this app", async () => {
+  it("returns the claims of a token Initiative signed for this plug-in", async () => {
     const { urls, fetchImpl } = jwksFetch();
     const token = signJwt(signing, contextClaims({ connection_refs: { account: "ref-1" } }), CONTEXT_TOKEN_TYPE);
     const verified = await verifyContextToken(token, options(fetchImpl));
     expect(verified).toMatchObject({
       community_ref: "gapp_abc",
-      app_install_id: 7,
+      plugin_install_id: 7,
       scope: "endpoint",
-      endpoint_id: "app.acme.tracker.read",
+      endpoint_id: "plugin.acme.tracker.read",
       connection_refs: { account: "ref-1" },
     });
     expect(urls).toEqual([`${BASE}${JWKS_PATH}`]);
   });
 
-  it("names the calling app, the actor and the member on a call from another app", async () => {
+  it("names the calling plug-in, the actor and the member on a call from another plug-in", async () => {
     const { fetchImpl } = jwksFetch();
     const token = signJwt(
       signing,
@@ -123,8 +123,8 @@ describe("verifyContextToken", () => {
   it("refuses caller claims of the wrong shape", async () => {
     const { fetchImpl } = jwksFetch();
     for (const [extra, message] of [
-      [{ act: "acme.automations" }, "act names no calling app"],
-      [{ act: { sub: "" } }, "act names no calling app"],
+      [{ act: "acme.automations" }, "act names no calling plug-in"],
+      [{ act: { sub: "" } }, "act names no calling plug-in"],
       [{ actor: "robot" }, "unknown actor robot"],
       [{ actor: "member" }, "a member call names no member"],
       [{ initiative_id: 0 }, "initiative_id is not an initiative"],
@@ -143,11 +143,11 @@ describe("verifyContextToken", () => {
     expect(urls).toEqual([`${BASE}${JWKS_PATH}`]);
   });
 
-  it("refuses a token for another app", async () => {
+  it("refuses a token for another plug-in", async () => {
     const { fetchImpl } = jwksFetch();
-    const token = signJwt(signing, contextClaims({ aud: audienceFor("other.app") }), CONTEXT_TOKEN_TYPE);
+    const token = signJwt(signing, contextClaims({ aud: audienceFor("other.plugin") }), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyContextToken(token, options(fetchImpl)))).toContain(
-      "initiative-app:other.app"
+      "initiative-plugin:other.plugin"
     );
   });
 
@@ -171,7 +171,7 @@ describe("verifyContextToken", () => {
 
   it("refuses a signature by a key the deployment did not publish", async () => {
     const { fetchImpl } = jwksFetch();
-    const stranger = generateAppKeys({ alg: "RS256" });
+    const stranger = generatePluginKeys({ alg: "RS256" });
     const token = signJwt(loadPrivateKey(stranger.privateKeyPem, "platform-1"), contextClaims(), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyContextToken(token, options(fetchImpl)))).toContain(
       "did not verify"
@@ -180,7 +180,7 @@ describe("verifyContextToken", () => {
 
   it("refuses any algorithm but RS256", async () => {
     const { fetchImpl } = jwksFetch();
-    const ec = generateAppKeys({ alg: "ES256", kid: "platform-1" });
+    const ec = generatePluginKeys({ alg: "ES256", kid: "platform-1" });
     const token = signJwt(loadPrivateKey(ec.privateKeyPem, "platform-1"), contextClaims(), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyContextToken(token, options(fetchImpl)))).toContain("ES256");
   });
@@ -216,7 +216,7 @@ describe("verifyContextToken", () => {
   });
 
   it("refetches once for an unknown kid, so a rotation resolves", async () => {
-    const next = generateAppKeys({ alg: "RS256", kid: "platform-2" });
+    const next = generatePluginKeys({ alg: "RS256", kid: "platform-2" });
     const both = { keys: [...platform.jwks.keys, ...next.jwks.keys] };
     const { urls, fetchImpl } = jwksFetch([platform.jwks, both]);
     const opts = options(fetchImpl);
@@ -252,7 +252,7 @@ describe("verifyHandoffToken", () => {
       surface_id: "panel",
       initiative_id: 3,
       community_ref: "gapp_abc",
-      app_install_id: 7,
+      plugin_install_id: 7,
       jti: "j-1",
     });
   });
@@ -283,7 +283,7 @@ describe("verifyHandoffToken", () => {
 
   it("checks the audience like a context token", async () => {
     const { fetchImpl } = jwksFetch();
-    const token = signJwt(signing, handoffClaims({ aud: audienceFor("other.app") }), HANDOFF_TOKEN_TYPE);
+    const token = signJwt(signing, handoffClaims({ aud: audienceFor("other.plugin") }), HANDOFF_TOKEN_TYPE);
     await expect(verifyHandoffToken(token, options(fetchImpl))).rejects.toThrow(
       ContextTokenError
     );
@@ -301,7 +301,7 @@ describe("verifyLifecycleToken", () => {
       scope: "lifecycle",
       hook: "after_connect",
       community_ref: "gapp_abc",
-      app_install_id: 7,
+      plugin_install_id: 7,
     });
   });
 
@@ -324,7 +324,7 @@ describe("verifyLifecycleToken", () => {
     const { fetchImpl } = jwksFetch();
     const elsewhere = signJwt(signing, lifecycleClaims({ aud: audienceFor("acme.other") }), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyLifecycleToken(elsewhere, options(fetchImpl)))).toMatch(
-      /is for initiative-app:acme.other/
+      /is for initiative-plugin:acme.other/
     );
     const stale = signJwt(signing, lifecycleClaims({ iat: NOW - 900, exp: NOW - 600 }), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyLifecycleToken(stale, options(fetchImpl)))).toMatch(/expired/);

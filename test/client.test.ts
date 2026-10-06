@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   ConsentRequiredError,
-  generateAppKeys,
+  generatePluginKeys,
   Initiative,
   InitiativeApiError,
   InitiativeAuthError,
@@ -17,8 +17,8 @@ import {
 } from "../src/client.js";
 
 const BASE = "https://initiative.example.com/api/v1";
-const TOKEN_URL = `${BASE}/app-platform/oauth/token`;
-const keys = generateAppKeys({ alg: "ES256", kid: "app-1" });
+const TOKEN_URL = `${BASE}/plugin-platform/oauth/token`;
+const keys = generatePluginKeys({ alg: "ES256", kid: "plugin-1" });
 const NOW = 1_780_000_000_000;
 
 interface Sent {
@@ -37,7 +37,7 @@ let clock: number;
 beforeEach(() => {
   sent = [];
   issued = 0;
-  scope = "projects:write apps:acme.github";
+  scope = "projects:write plugins:acme.github";
   answers = new Map();
   clock = NOW;
 });
@@ -81,8 +81,8 @@ const initiative = () =>
 const tokenForms = () => sent.filter((one) => one.url === TOKEN_URL).map((one) => new URLSearchParams(one.body));
 
 describe("tokens", () => {
-  it("asks for an installation token with an assertion the app's key signed, addressed to the token endpoint", async () => {
-    answers.set("GET /api/v1/app-platform/installation/config", () => json(200, { community_ref: "gapp_1" }));
+  it("asks for an installation token with an assertion the plug-in's key signed, addressed to the token endpoint", async () => {
+    answers.set("GET /api/v1/plugin-platform/installation/config", () => json(200, { community_ref: "gapp_1" }));
     await initiative().asInstallation("gapp_1").config();
 
     const [form] = tokenForms();
@@ -96,12 +96,12 @@ describe("tokens", () => {
   });
 
   it("reuses a token until shortly before it expires, and shares one request between concurrent callers", async () => {
-    answers.set("POST /api/v1/app-platform/installation/events", () => json(202, {}));
+    answers.set("POST /api/v1/plugin-platform/installation/events", () => json(202, {}));
     const client = initiative().asInstallation("gapp_1");
-    await Promise.all([client.emitEvent({ eventType: "app.acme.tracker.x" }), client.emitEvent({ eventType: "app.acme.tracker.x" })]);
+    await Promise.all([client.emitEvent({ eventType: "plugin.acme.tracker.x" }), client.emitEvent({ eventType: "plugin.acme.tracker.x" })]);
     expect(issued).toBe(1);
     clock += 571_000;
-    await client.emitEvent({ eventType: "app.acme.tracker.x" });
+    await client.emitEvent({ eventType: "plugin.acme.tracker.x" });
     expect(issued).toBe(2);
   });
 
@@ -116,15 +116,15 @@ describe("tokens", () => {
 
   it("asks for a standing only when told to, and only where it applies", async () => {
     answers.set("GET /api/v1/c/0/projects/", () => json(200, []));
-    const app = initiative();
-    await app.asInstallation("gapp_1", { initiative: 42, level: "moderator" }).request("GET", "/projects/", { scope: "projects:read" });
-    await app.asInstallation("gapp_1", { level: "community_admin" }).request("GET", "/projects/", { scope: "projects:read" });
+    const plugin = initiative();
+    await plugin.asInstallation("gapp_1", { initiative: 42, level: "moderator" }).request("GET", "/projects/", { scope: "projects:read" });
+    await plugin.asInstallation("gapp_1", { level: "community_admin" }).request("GET", "/projects/", { scope: "projects:read" });
     expect(tokenForms().map((form) => [form.get("level"), form.get("resource")])).toEqual([
       ["moderator", "urn:initiative:initiative:42"],
       ["community_admin", null],
     ]);
-    expect(() => app.asInstallation("gapp_1", { level: "moderator" })).toThrow("narrowed to one initiative");
-    expect(() => app.asInstallation("gapp_1", { initiative: 42, level: "community_admin" })).toThrow("not narrowed");
+    expect(() => plugin.asInstallation("gapp_1", { level: "moderator" })).toThrow("narrowed to one initiative");
+    expect(() => plugin.asInstallation("gapp_1", { initiative: 42, level: "community_admin" })).toThrow("not narrowed");
   });
 
   it("acts for a member on the JWT-bearer grant, and says when they have not consented", async () => {
@@ -176,25 +176,25 @@ describe("calls", () => {
   });
 
   it("raises Initiative's detail on a refusal", async () => {
-    answers.set("POST /api/v1/app-platform/installation/connections/cref_1/token", () => json(409, { detail: "APP_CHANNEL_CONNECTION_EXPIRED" }));
+    answers.set("POST /api/v1/plugin-platform/installation/connections/cref_1/token", () => json(409, { detail: "PLUGIN_CHANNEL_CONNECTION_EXPIRED" }));
     const error = await initiative().asInstallation("gapp_1").connectionToken("cref_1").catch((caught) => caught);
     expect(error).toBeInstanceOf(InitiativeApiError);
-    expect(error).toMatchObject({ status: 409, detail: "APP_CHANNEL_CONNECTION_EXPIRED" });
+    expect(error).toMatchObject({ status: 409, detail: "PLUGIN_CHANNEL_CONNECTION_EXPIRED" });
   });
 
-  it("calls another app through Initiative, needing apps:<its public id>", async () => {
-    answers.set("POST /api/v1/app-platform/apps/acme.github/endpoints/app.acme.github.open-issue", () =>
-      json(200, { endpoint: "app.acme.github.open-issue", actor: "member", result: { number: 7 } })
+  it("calls another plug-in through Initiative, needing plugins:<its public id>", async () => {
+    answers.set("POST /api/v1/plugin-platform/plugins/acme.github/endpoints/plugin.acme.github.open-issue", () =>
+      json(200, { endpoint: "plugin.acme.github.open-issue", actor: "member", result: { number: 7 } })
     );
     const client = initiative().asMember("gapp_1", "uapp_alice");
-    const outcome = await client.callApp("acme.github", "app.acme.github.open-issue", { title: "x" });
+    const outcome = await client.callPlugin("acme.github", "plugin.acme.github.open-issue", { title: "x" });
     expect(outcome.result).toEqual({ number: 7 });
     expect(JSON.parse(sent.at(-1)!.body)).toEqual({ params: { title: "x" } });
-    await expect(client.callApp("acme.slack", "app.acme.slack.post")).rejects.toBeInstanceOf(MissingScopeError);
+    await expect(client.callPlugin("acme.slack", "plugin.acme.slack.post")).rejects.toBeInstanceOf(MissingScopeError);
   });
 });
 
-describe("the app API", () => {
+describe("the plug-in API", () => {
   const routes = () => sent.filter((one) => one.url !== TOKEN_URL).map((one) => `${one.method} ${one.url.slice(BASE.length)}`);
 
   it("sends a typed call's method, path, query and body under /c/0, and answers its body", async () => {
@@ -269,7 +269,7 @@ describe("the app API", () => {
 
 describe("the installation itself", () => {
   it("reads its configuration, connections and connection tokens, reports status and emits events", async () => {
-    answers.set("GET /api/v1/app-platform/installation/config", () =>
+    answers.set("GET /api/v1/plugin-platform/installation/config", () =>
       json(200, {
         community_ref: "gapp_1",
         install_id: 3,
@@ -284,16 +284,16 @@ describe("the installation itself", () => {
         member_connections: [{ connection_id: "account", connection_ref: "cref_a", status: "connected", values: {} }],
       })
     );
-    answers.set("GET /api/v1/app-platform/installation/connections", () =>
+    answers.set("GET /api/v1/plugin-platform/installation/connections", () =>
       json(200, { items: [{ connection_id: "account", connection_ref: "cref_a", status: "connected", blocked: false, account_label: "@a" }] })
     );
-    answers.set("POST /api/v1/app-platform/installation/connections/cref_ws/token", () =>
+    answers.set("POST /api/v1/plugin-platform/installation/connections/cref_ws/token", () =>
       json(200, { access_token: "vendor-token", expires_at: 1_780_000_600 })
     );
-    answers.set("POST /api/v1/app-platform/installation/config-status", (request) =>
+    answers.set("POST /api/v1/plugin-platform/installation/config-status", (request) =>
       json(200, { community_ref: "gapp_1", install_id: 3, config_state: JSON.parse(request.body).state, config_state_detail: null })
     );
-    answers.set("POST /api/v1/app-platform/installation/events", () => json(202, { status: "accepted" }));
+    answers.set("POST /api/v1/plugin-platform/installation/events", () => json(202, { status: "accepted" }));
 
     // A member's client reaches the installation on the installation's token.
     const client = initiative().asMember("gapp_1", "uapp_alice", { initiative: 5 });
@@ -307,9 +307,9 @@ describe("the installation itself", () => {
     expect(await client.connections()).toMatchObject([{ connectionRef: "cref_a", accountLabel: "@a" }]);
     expect(await client.connectionToken("cref_ws")).toEqual({ accessToken: "vendor-token", expiresAt: 1_780_000_600_000 });
     expect(await client.reportConfigStatus({ state: "invalid", detail: "missing_scope" })).toMatchObject({ configState: "invalid" });
-    await client.emitEvent({ eventType: "app.acme.tracker.ticket-opened", payload: { number: 1 }, initiativeId: 5 });
+    await client.emitEvent({ eventType: "plugin.acme.tracker.ticket-opened", payload: { number: 1 }, initiativeId: 5 });
     expect(JSON.parse(sent.at(-1)!.body)).toEqual({
-      event_type: "app.acme.tracker.ticket-opened",
+      event_type: "plugin.acme.tracker.ticket-opened",
       payload: { number: 1 },
       initiative_id: 5,
     });
@@ -321,7 +321,7 @@ describe("the installation itself", () => {
   });
 
   it("asks a member for consent on the installation's token", async () => {
-    answers.set("POST /api/v1/app-platform/consent-requests", (request) => json(201, JSON.parse(request.body)));
+    answers.set("POST /api/v1/plugin-platform/consent-requests", (request) => json(201, JSON.parse(request.body)));
     const answer = await initiative()
       .asInstallation("gapp_1")
       .requestConsent({ member: "uapp_alice", purpose: "node-7", label: "Comment as you", access: "read_write" });
@@ -329,10 +329,10 @@ describe("the installation itself", () => {
   });
 
   it("lists every installation, following the pages to the end", async () => {
-    answers.set("GET /api/v1/app-platform/installations", (request) =>
+    answers.set("GET /api/v1/plugin-platform/installations", (request) =>
       new URL(request.url).searchParams.get("page") === "2"
         ? json(200, [{ installation: "gapp_2", active: false }])
-        : json(200, [{ installation: "gapp_1", active: true }], { Link: '</api/v1/app-platform/installations?page=2>; rel="next"' })
+        : json(200, [{ installation: "gapp_1", active: true }], { Link: '</api/v1/plugin-platform/installations?page=2>; rel="next"' })
     );
     expect(await initiative().installations()).toEqual([
       { installation: "gapp_1", active: true },
