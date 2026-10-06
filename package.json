@@ -6,10 +6,10 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Morelitea/initiative-plugin-sdk.git"
+    "url": "git+https://github.com/beyonders-studio/initiative-plugin-sdk.git"
   },
-  "homepage": "https://github.com/Morelitea/initiative-plugin-sdk#readme",
-  "bugs": "https://github.com/Morelitea/initiative-plugin-sdk/issues",
+  "homepage": "https://github.com/beyonders-studio/initiative-plugin-sdk#readme",
+  "bugs": "https://github.com/beyonders-studio/initiative-plugin-sdk/issues",
   "keywords": [
     "initiative",
     "plugin",
