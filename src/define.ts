@@ -1,7 +1,7 @@
 /**
- * One typed definition of an app.
+ * One typed definition of a plug-in.
  *
- * {@link definePlugin} takes everything an app declares and does: its endpoints
+ * {@link definePlugin} takes everything a plug-in declares and does: its endpoints
  * with their handlers, its hooks and schedules, its widgets and surfaces, and
  * its listing. The same object routes Initiative's calls (`createPlugin`) and
  * becomes the manifest (`initiative-plugin build`), so nothing is stated twice.
@@ -10,12 +10,12 @@
  * `params` type the handler's arguments and its `returns` type what the
  * handler answers with.
  *
- * A declarative app gives each endpoint a `request` (or `steps`) and a `map`
+ * A declarative plug-in gives each endpoint a `request` (or `steps`) and a `map`
  * in place of a handler, and names its `hosts`: Initiative then makes the
- * calls and maps the answers itself, and there is no service to run. One app
+ * calls and maps the answers itself, and there is no service to run. One plug-in
  * is one kind or the other.
  *
- * Endpoints are named by their key. The manifest id is `app.<publicId>.<key>`,
+ * Endpoints are named by their key. The manifest id is `plugin.<publicId>.<key>`,
  * and everywhere a definition refers to an endpoint (a widget, a sample, a
  * parameter's `options_from`, a bundled dashboard, `communitySummary`) it uses the
  * key.
@@ -50,7 +50,7 @@ import type { Client } from "./client.js";
 /**
  * What every handler is handed as `context`: the value given to `createPlugin`.
  *
- * Empty until an app says what it holds, by augmenting this interface:
+ * Empty until a plug-in says what it holds, by augmenting this interface:
  *
  * ```ts
  * declare module "initiative-plugin-sdk/manifest" {
@@ -97,7 +97,7 @@ export type Actor = { kind: "installation" } | { kind: "member"; member: string 
 
 /** What every handler is handed. */
 export interface Call {
-  /** The installation: the community, by the reference this app's install knows it by. */
+  /** The installation: the community, by the reference this plug-in's install knows it by. */
   installation: string;
   /** Initiative, acting as whoever the call is for. */
   client: Client;
@@ -110,7 +110,7 @@ export interface EndpointCall<P> extends Call {
   params: Params<P>;
   /** Initiative's own calls, for a widget, are the community's. */
   actor: Actor;
-  /** The app that made this call through Initiative, by its public id, or null for Initiative's own. */
+  /** The plug-in that made this call through Initiative, by its public id, or null for Initiative's own. */
   caller: string | null;
   /** The initiative the call is confined to, when it is. */
   initiative: number | null;
@@ -126,7 +126,7 @@ export interface Outcome<R> {
 
 type Described = Omit<Endpoint, "id" | "direction" | "params" | "returns" | "request" | "steps" | "map" | "errors">;
 
-/** An endpoint Initiative calls: a `read`, or a `write` another app calls through it. */
+/** An endpoint Initiative calls: a `read`, or a `write` another plug-in calls through it. */
 export interface CallableEndpoint<P, R, D extends "read" | "write" = "read" | "write"> extends Described {
   direction: D;
   params?: P;
@@ -135,7 +135,7 @@ export interface CallableEndpoint<P, R, D extends "read" | "write" = "read" | "w
 }
 
 /**
- * An endpoint a declarative app answers without code: Initiative makes the
+ * An endpoint a declarative plug-in answers without code: Initiative makes the
  * `request`, or each of the `steps` in order, and `map` turns the answer into
  * the endpoint's returns.
  */
@@ -147,7 +147,7 @@ export type DeclarativeEndpoint<P, R, D extends "read" | "write" = "read" | "wri
   errors?: ErrorRule[];
 } & ({ request: VendorRequest; steps?: never } | { steps: RequestStep[]; request?: never });
 
-/** An announcement the app emits: declared, never called. */
+/** An announcement the plug-in emits: declared, never called. */
 export interface EmittedEndpoint<R> extends Described {
   direction: "emit";
   returns?: R;
@@ -230,7 +230,7 @@ export interface ScheduleDeclaration {
   run: (call: ScheduleCall) => Promise<void>;
 }
 
-/** A member opening one of the app's surfaces, as the handoff token names them. */
+/** A member opening one of the plug-in's surfaces, as the handoff token names them. */
 export interface Handoff extends Call {
   surface: string;
   /** The member, by this installation's reference for them. */
@@ -248,7 +248,7 @@ export interface SurfaceCall {
 }
 
 /**
- * A page of the app that Initiative frames. The page is the app's own; a
+ * A page of the plug-in that Initiative frames. The page is the plug-in's own; a
  * request under its path that carries a handoff token reaches the handler with
  * the handoff verified.
  */
@@ -266,19 +266,19 @@ type EmitName<E> = {
 }[keyof E] &
   string;
 
-/** The vendor's webhooks. A declarative app's events name the emit endpoint by its key. */
+/** The vendor's webhooks. A declarative plug-in's events name the emit endpoint by its key. */
 export type WebhooksDeclaration<E> = Omit<Webhooks, "events"> & {
   events?: Array<Omit<WebhookEvent, "emit"> & { emit: EmitName<E> }>;
 };
 
 type ReturnsOf<X> = X extends { returns?: infer R } ? NonNullable<R> : {};
 
-/** A dashboard tile the app contributes. `module` is the widget's source file. */
+/** A dashboard tile the plug-in contributes. `module` is the widget's source file. */
 export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "module_source" | "endpoints" | "sample_data"> {
   /** Read endpoints the widget may be bound to. */
   endpoints?: readonly ReadName<E>[];
   /**
-   * The widget's TypeScript module, relative to the app's package: it exports
+   * The widget's TypeScript module, relative to the plug-in's package: it exports
    * `render(data)`. The build bundles it into the manifest's `module_source`.
    */
   module: string;
@@ -296,7 +296,7 @@ export interface DashboardDeclaration<E, W> extends Omit<BundledDashboard, "widg
 }
 
 /**
- * The app's registry listing. `initiative-plugin build --registry <dir>` writes it
+ * The plug-in's registry listing. `initiative-plugin build --registry <dir>` writes it
  * while `version` is the package's own version.
  */
 export interface ListingDeclaration {
@@ -306,19 +306,19 @@ export interface ListingDeclaration {
   summary: string;
   /** The listing page's longer text. Markdown. */
   description?: string;
-  /** The listing's picture, relative to the app's package. */
+  /** The listing's picture, relative to the plug-in's package. */
   avatar: string;
   version: string;
   /** The oldest Initiative release this version runs on. */
   minAppVersion?: string;
   releaseNotes?: string;
   /**
-   * A container app's image for this version, pinned by digest. Every
+   * A container plug-in's image for this version, pinned by digest. Every
    * deployment runs its own copy and gives the key it signs with, so a listing
-   * names no keys. A declarative app has none.
+   * names no keys. A declarative plug-in has none.
    */
   image?: string;
-  /** The most the app may ever be granted. Absent: its `scopes`. */
+  /** The most the plug-in may ever be granted. Absent: its `scopes`. */
   scopeCeiling?: Array<Scope | PluginScope>;
   referenceSectors?: string[];
   /**
@@ -328,7 +328,7 @@ export interface ListingDeclaration {
    * `image` above, and `${INITIATIVE_URL}`, the deployment's public address;
    * any other `${…}` is refused. `baseUrl` is where the service answers on the
    * Compose network, such as `http://tracker:8080`: an http or https URL of at
-   * most 512 characters. A container app's only.
+   * most 512 characters. A container plug-in's only.
    */
   compose?: { service: string; baseUrl: string };
 }
@@ -340,9 +340,9 @@ export interface PluginDefinition<E, W> {
   uid: string;
   name: string;
   scopes?: Array<Scope | PluginScope>;
-  /** A declarative app's hosts: every host its requests may reach. Naming them makes the app declarative. */
+  /** A declarative plug-in's hosts: every host its requests may reach. Naming them makes the plug-in declarative. */
   hosts?: string[];
-  /** How a declarative app's requests carry their credential. Absent: `Authorization: Bearer <token>`. */
+  /** How a declarative plug-in's requests carry their credential. Absent: `Authorization: Bearer <token>`. */
   auth?: VendorAuth;
   vendor?: Vendor;
   /** Keyed by connection id. */
@@ -351,7 +351,7 @@ export interface PluginDefinition<E, W> {
   /** Keyed by schedule id. Each runs through the `schedule` hook. */
   schedules?: Record<string, ScheduleDeclaration>;
   endpoints?: E;
-  /** A read endpoint describing the community's standing with the app's service. */
+  /** A read endpoint describing the community's standing with the plug-in's service. */
   communitySummary?: ReadName<E>;
   hooks?: Hooks;
   widgets?: W;
@@ -361,13 +361,13 @@ export interface PluginDefinition<E, W> {
   listing?: ListingDeclaration;
 }
 
-/** Any app's definition, as the server and the build read it. */
+/** Any plug-in's definition, as the server and the build read it. */
 export type AnyPlugin = Omit<PluginDefinition<any, any>, "endpoints" | "widgets"> & {
   endpoints?: Record<string, EndpointDeclaration>;
   widgets?: Record<string, WidgetDeclaration<any>>;
 };
 
-/** The app, declared once. */
+/** The plug-in, declared once. */
 export function definePlugin<
   const E extends Record<string, EndpointDeclaration> = {},
   const W extends Record<string, WidgetDeclaration<E>> = {},
@@ -376,8 +376,8 @@ export function definePlugin<
 }
 
 /** An endpoint's manifest id. */
-export function endpointId(app: { publicId: string }, name: string): string {
-  return `app.${app.publicId}.${name}`;
+export function endpointId(plugin: { publicId: string }, name: string): string {
+  return `plugin.${plugin.publicId}.${name}`;
 }
 
 /**
@@ -386,24 +386,24 @@ export function endpointId(app: { publicId: string }, name: string): string {
  * `modules` by widget id. A definition naming `hosts` is declarative, and its
  * manifest has no `service` block.
  */
-export function manifestOf(app: AnyPlugin, modules: Record<string, string> = {}): Manifest {
-  const id = (name: string) => endpointId(app, name);
+export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = {}): Manifest {
+  const id = (name: string) => endpointId(plugin, name);
   const blocks: Partial<Manifest> = {
-    vendor: app.vendor,
-    connections: listOf(app.connections, (key, connection) => ({ id: key, ...connection })),
-    webhooks: app.webhooks && {
-      ...app.webhooks,
-      ...(app.webhooks.events ? { events: app.webhooks.events.map((event) => ({ ...event, emit: id(event.emit) })) } : {}),
+    vendor: plugin.vendor,
+    connections: listOf(plugin.connections, (key, connection) => ({ id: key, ...connection })),
+    webhooks: plugin.webhooks && {
+      ...plugin.webhooks,
+      ...(plugin.webhooks.events ? { events: plugin.webhooks.events.map((event) => ({ ...event, emit: id(event.emit) })) } : {}),
     },
-    schedules: listOf(app.schedules, (key, schedule) => ({ id: key, every: schedule.every })),
-    endpoints: listOf(app.endpoints, (key, endpoint) => endpointOf(id(key), endpoint, id)),
-    community_summary: app.communitySummary === undefined ? undefined : id(app.communitySummary),
-    widgets: listOf(app.widgets, (key, widget) => widgetOf(key, widget, modules[key] ?? "", id)),
-    embeds: listOf(app.surfaces, (key, surface) => {
+    schedules: listOf(plugin.schedules, (key, schedule) => ({ id: key, every: schedule.every })),
+    endpoints: listOf(plugin.endpoints, (key, endpoint) => endpointOf(id(key), endpoint, id)),
+    community_summary: plugin.communitySummary === undefined ? undefined : id(plugin.communitySummary),
+    widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, modules[key] ?? "", id)),
+    embeds: listOf(plugin.surfaces, (key, surface) => {
       const { handler: _handler, ...embed } = surface;
       return { id: key, ...embed };
     }),
-    dashboards: app.dashboards?.map((dashboard) => ({
+    dashboards: plugin.dashboards?.map((dashboard) => ({
       ...dashboard,
       widgets: dashboard.widgets.map((widget) => ({
         ...widget,
@@ -416,13 +416,13 @@ export function manifestOf(app: AnyPlugin, modules: Record<string, string> = {})
   ) as Partial<Manifest>;
   return {
     plugin_kind: "service",
-    ...(app.hosts
+    ...(plugin.hosts
       ? {}
-      : { service: { public_id: app.publicId, protocol: 1, ...(app.scopes ? { scopes: [...app.scopes] } : {}) } }),
+      : { service: { public_id: plugin.publicId, protocol: 1, ...(plugin.scopes ? { scopes: [...plugin.scopes] } : {}) } }),
     features: FEATURES.filter((feature) => present[feature] !== undefined),
-    default_name: app.name,
-    ...(app.hosts ? { hosts: [...app.hosts] } : {}),
-    ...(app.auth ? { auth: app.auth } : {}),
+    default_name: plugin.name,
+    ...(plugin.hosts ? { hosts: [...plugin.hosts] } : {}),
+    ...(plugin.auth ? { auth: plugin.auth } : {}),
     ...present,
   };
 }

@@ -1,5 +1,5 @@
 /**
- * `initiative-plugin-sdk/manifest`: the contract as types, the app's one
+ * `initiative-plugin-sdk/manifest`: the contract as types, the plug-in's one
  * definition, and checking a manifest before a deployment does.
  */
 

@@ -1,17 +1,17 @@
 /**
- * Your app's signing keys.
+ * Your plug-in's signing keys.
  *
- * An app proves who it is to Initiative by signing a short JWT with its own
+ * A plug-in proves who it is to Initiative by signing a short JWT with its own
  * private key (`private_key_jwt`, RFC 7523). The deployment's operator
- * registers the matching public keys — a JWKS — against your app's public id,
- * and the private key never leaves your app.
+ * registers the matching public keys — a JWKS — against your plug-in's public id,
+ * and the private key never leaves your plug-in.
  *
  * Two algorithms are supported, and the deployment picks the one to check by
  * the registered key's type: `RS256` for an RSA key, `ES256` for a P-256 key.
  *
  * Every key carries a `kid`. Each JWT names the `kid` it was signed with, so
  * rotating is: generate a new key, have the operator register a JWKS holding
- * both public keys, switch your app to the new one, then drop the old entry.
+ * both public keys, switch your plug-in to the new one, then drop the old entry.
  */
 
 import {
@@ -23,7 +23,7 @@ import {
   type KeyObject,
 } from "node:crypto";
 
-/** The algorithms an app key may use. */
+/** The algorithms a plug-in key may use. */
 export type PluginKeyAlgorithm = "RS256" | "ES256";
 
 /** One public key, as a JWK. */
@@ -39,7 +39,7 @@ export interface PublicJwk {
   y?: string;
 }
 
-/** A JSON Web Key Set: what the operator registers for your app. */
+/** A JSON Web Key Set: what the operator registers for your plug-in. */
 export interface Jwks {
   keys: PublicJwk[];
 }
@@ -131,7 +131,7 @@ export function algorithmOf(key: KeyObject): PluginKeyAlgorithm {
 }
 
 /**
- * Sign a compact JWT with an app key. `typ` goes in the header; an app's own
+ * Sign a compact JWT with a plug-in key. `typ` goes in the header; a plug-in's own
  * assertions are plain `JWT`.
  *
  * ES256 signatures are written in the JOSE form (`r || s`, 64 bytes), which is
@@ -157,8 +157,8 @@ function base64url(text: string): string {
 
 /**
  * A public key's fingerprint: its RFC 7638 SHA-256 thumbprint, base64url
- * without padding. The app logs it at start, and Initiative shows the same
- * value for the key it reads from the app.
+ * without padding. The plug-in logs it at start, and Initiative shows the same
+ * value for the key it reads from the plug-in.
  */
 export function jwkThumbprint(jwk: PublicJwk): string {
   const members =

@@ -1,5 +1,5 @@
 /**
- * A declarative app's requests and mappings, run against recorded answers
+ * A declarative plug-in's requests and mappings, run against recorded answers
  * exactly as Initiative will run them: what is sent, what each answer means,
  * and the bounds every expression is evaluated within.
  */
@@ -8,9 +8,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CAPS } from "../src/contract.js";
 import { evaluate, runAfterConnect, runEndpoint, runHealth, runWebhook } from "../src/testing.js";
-import { issuesPlugin } from "./support/app.js";
+import { issuesPlugin } from "./support/plugin.js";
 
-const app = issuesPlugin();
+const plugin = issuesPlugin();
 const now = "2026-10-02T12:00:00.000Z";
 const workspace = { workspace: { owner: "acme" } };
 
@@ -18,7 +18,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("runEndpoint", () => {
   it("renders each page's request, and maps every page's items", async () => {
-    const run = await runEndpoint(app, "open-issues", {
+    const run = await runEndpoint(plugin, "open-issues", {
       params: { state: "Open" },
       connections: workspace,
       now,
@@ -37,12 +37,12 @@ describe("runEndpoint", () => {
 
   it("refuses a range past max_pages when on_limit says so", async () => {
     const full = { body: [{ title: "A" }, { title: "B" }] };
-    const run = await runEndpoint(app, "open-issues", { connections: workspace, now, responses: [full, full] });
+    const run = await runEndpoint(plugin, "open-issues", { connections: workspace, now, responses: [full, full] });
     expect(run).toMatchObject({ unavailable: "range-too-large" });
   });
 
   it("runs steps in order, each reading the ones before it", async () => {
-    const run = await runEndpoint(app, "label", {
+    const run = await runEndpoint(plugin, "label", {
       params: { number: 7, label: "bug" },
       connections: workspace,
       now,
@@ -66,7 +66,7 @@ describe("runEndpoint", () => {
     [{ status: 429 }, { transient: true }],
     [{ status: 502 }, { transient: true }],
   ])("answers %j with its rule or the default", async (response, answered) => {
-    const run = await runEndpoint(app, "label", { params: { number: 7 }, connections: workspace, now, responses: [response] });
+    const run = await runEndpoint(plugin, "label", { params: { number: 7 }, connections: workspace, now, responses: [response] });
     expect(run).toEqual({ requests: [expect.objectContaining({ method: "GET" })], ...answered });
   });
 
@@ -74,7 +74,7 @@ describe("runEndpoint", () => {
     const page = (ids: string[], more: boolean) => ({
       body: { data: { issues: { nodes: ids.map((id) => ({ id })), pageInfo: { endCursor: ids.at(-1), hasNextPage: more } } } },
     });
-    const run = await runEndpoint(app, "search", { now, responses: [page(["a"], true), page(["b"], false)] });
+    const run = await runEndpoint(plugin, "search", { now, responses: [page(["a"], true), page(["b"], false)] });
     expect(run.requests.map((request) => (request.body as { variables: unknown }).variables)).toEqual([
       { after: null },
       { after: "a" },
@@ -83,7 +83,7 @@ describe("runEndpoint", () => {
   });
 
   it("reads each connection the endpoint requires as connections.<id>, beside the request's own", async () => {
-    const run = await runEndpoint(app, "assign", {
+    const run = await runEndpoint(plugin, "assign", {
       params: { number: 7 },
       connections: { ...workspace, account: {}, elsewhere: { owner: "other" } },
       now,
@@ -105,10 +105,10 @@ describe("runEndpoint", () => {
 
   it("fails on an answer that does not fit the returns, and on a response nothing asked for", async () => {
     await expect(
-      runEndpoint(app, "open-issues", { connections: workspace, now, responses: [{ body: [{ title: 1 }] }] })
+      runEndpoint(plugin, "open-issues", { connections: workspace, now, responses: [{ body: [{ title: 1 }] }] })
     ).rejects.toThrow("answered 'titles' as 1, which is not string");
     await expect(
-      runEndpoint(app, "open-issues", { connections: workspace, now, responses: [{ body: [] }, { body: [] }] })
+      runEndpoint(plugin, "open-issues", { connections: workspace, now, responses: [{ body: [] }, { body: [] }] })
     ).rejects.toThrow("1 recorded response(s) were not asked for");
   });
 });
@@ -120,7 +120,7 @@ describe("runAfterConnect", () => {
   ];
 
   it("follows the Link header and maps the installation it came back with", async () => {
-    const run = await runAfterConnect(app, "workspace", { params: { installation_id: "2" }, now, responses: pages });
+    const run = await runAfterConnect(plugin, "workspace", { params: { installation_id: "2" }, now, responses: pages });
     expect(run.requests.map((request) => request.url)).toEqual([
       "https://api.tracker.example/user/installations",
       "https://api.tracker.example/user/installations?page=2",
@@ -128,15 +128,15 @@ describe("runAfterConnect", () => {
     expect(run).toMatchObject({ result: { values: { owner: "acme" }, account_label: "acme" } });
   });
 
-  it("answers mapping-failed, saying why, for a next page off the app's hosts", async () => {
+  it("answers mapping-failed, saying why, for a next page off the plug-in's hosts", async () => {
     const away = { headers: { Link: '<https://elsewhere.example/more>; rel="next"' }, body: { installations: [] } };
-    const run = await runAfterConnect(app, "workspace", { now, responses: [away] });
+    const run = await runAfterConnect(plugin, "workspace", { now, responses: [away] });
     expect(run).toMatchObject({ unavailable: "mapping-failed", requests: [{ url: "https://api.tracker.example/user/installations" }] });
-    expect("detail" in run && run.detail).toContain("https://elsewhere.example/more is not https on one of the app's hosts");
+    expect("detail" in run && run.detail).toContain("https://elsewhere.example/more is not https on one of the plug-in's hosts");
   });
 
   it("refuses when refuse_when holds", async () => {
-    const run = await runAfterConnect(app, "workspace", { params: { installation_id: "9" }, now, responses: pages });
+    const run = await runAfterConnect(plugin, "workspace", { params: { installation_id: "9" }, now, responses: pages });
     expect(run).toMatchObject({ refused: "not-installed" });
   });
 
@@ -180,7 +180,7 @@ describe("runHealth", () => {
     [{ status: 403, body: { reason: "suspended" } }, "suspended"],
     [{ status: 500 }, "unavailable"],
   ])("reads %j as %s", async (response, state) => {
-    const run = await runHealth(app, "workspace", { fields: { owner: "acme" }, now, responses: [response] });
+    const run = await runHealth(plugin, "workspace", { fields: { owner: "acme" }, now, responses: [response] });
     expect(run.requests[0].url).toBe("https://api.tracker.example/installations/acme");
     expect(run).toMatchObject({ result: state });
   });
@@ -189,15 +189,15 @@ describe("runHealth", () => {
 describe("runWebhook", () => {
   it("emits the first matching event, and sets a connection's state", async () => {
     expect(
-      await runWebhook(app, {
+      await runWebhook(plugin, {
         headers: { "X-Event": "issues" },
         payload: { action: "opened", issue: { number: 7, title: "Broken" } },
       })
     ).toEqual({ event: { emit: "issue-opened", payload: { number: 7, title: "Broken" } } });
-    expect(await runWebhook(app, { headers: { "X-Event": "installation" }, payload: { action: "suspend" } })).toEqual({
+    expect(await runWebhook(plugin, { headers: { "X-Event": "installation" }, payload: { action: "suspend" } })).toEqual({
       status: { connection: "workspace", state: "suspended" },
     });
-    expect(await runWebhook(app, { headers: { "X-Event": "push" }, payload: {} })).toEqual({});
+    expect(await runWebhook(plugin, { headers: { "X-Event": "push" }, payload: {} })).toEqual({});
   });
 });
 

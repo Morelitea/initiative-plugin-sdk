@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 /**
- * `initiative-plugin`: start, build, pack and upload an app, and keys and
+ * `initiative-plugin`: start, build, pack and upload a plug-in, and keys and
  * manifest checks.
  *
  *   initiative-plugin init [dir] [--example minimal]
- *   initiative-plugin build [--app <file>] [--registry <dir>] [--check]
- *   initiative-plugin pack [--app <file>] [--out <file>]
- *   initiative-plugin dev --initiative <url> [--api-key <key>] [--app <file>]
+ *   initiative-plugin build [--plugin <file>] [--registry <dir>] [--check]
+ *   initiative-plugin pack [--plugin <file>] [--out <file>]
+ *   initiative-plugin dev --initiative <url> [--api-key <key>] [--plugin <file>]
  *   initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]
  *   initiative-plugin validate <file.json>   a manifest, or a served manifest document
  *   initiative-plugin schema                 print the schema a manifest is checked against
  *   initiative-plugin uid                    mint a catalog uid
  *
- * `build` reads the app's definition (default `src/app.ts`) and writes
- * `manifest.json`, and with `--registry` the app's registry source; see
- * `build.ts`. `pack` writes the app's listing file, which a self-hosted
- * deployment publishes as its own app (`pack.ts`), and `dev` uploads it to one
+ * `build` reads the plug-in's definition (default `src/plugin.ts`) and writes
+ * `manifest.json`, and with `--registry` the plug-in's registry source; see
+ * `build.ts`. `pack` writes the plug-in's listing file, which a self-hosted
+ * deployment publishes as its own plug-in (`pack.ts`), and `dev` uploads it to one
  * and again on each change (`dev.ts`); its key may be given as
  * `INITIATIVE_API_KEY` instead. `init` copies an example (`init.ts`).
  * `keygen` writes `private-key.pem` (mode 0600) and `jwks.json`
@@ -37,9 +37,9 @@ function usage(): never {
     [
       "usage:",
       "  initiative-plugin init [dir] [--example minimal]",
-      "  initiative-plugin build [--app <file>] [--registry <dir>] [--check]",
-      "  initiative-plugin pack [--app <file>] [--out <file>]",
-      "  initiative-plugin dev --initiative <url> [--api-key <key>] [--app <file>]",
+      "  initiative-plugin build [--plugin <file>] [--registry <dir>] [--check]",
+      "  initiative-plugin pack [--plugin <file>] [--out <file>]",
+      "  initiative-plugin dev --initiative <url> [--api-key <key>] [--plugin <file>]",
       "  initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]",
       "  initiative-plugin validate <file.json>",
       "  initiative-plugin schema",
@@ -88,7 +88,7 @@ function keygen(args: string[]): number {
   process.stdout.write(
     [
       `wrote ${keyPath} (keep it secret)`,
-      `wrote ${jwksPath} (the public half, for the app's listing or a deployment's operator)`,
+      `wrote ${jwksPath} (the public half, for the plug-in's listing or a deployment's operator)`,
       `kid: ${keys.kid}`,
       `alg: ${keys.alg}`,
       "",
@@ -126,26 +126,26 @@ async function main(argv: string[]): Promise<number> {
       return init({ dir, example: options.example ?? "minimal" });
     }
     case "build": {
-      const options = flags(rest, ["app", "registry"], ["check"]);
+      const options = flags(rest, ["plugin", "registry"], ["check"]);
       return build({
         root: process.cwd(),
-        app: typeof options.app === "string" ? options.app : "src/app.ts",
+        plugin: typeof options.plugin === "string" ? options.plugin : "src/plugin.ts",
         ...(typeof options.registry === "string" ? { registry: options.registry } : {}),
         check: options.check === true,
       });
     }
     case "pack": {
-      const options = flags(rest, ["app", "out"]) as Record<string, string>;
-      return pack({ root: process.cwd(), app: options.app ?? "src/app.ts", out: options.out });
+      const options = flags(rest, ["plugin", "out"]) as Record<string, string>;
+      return pack({ root: process.cwd(), plugin: options.plugin ?? "src/plugin.ts", out: options.out });
     }
     case "dev": {
-      const options = flags(rest, ["initiative", "api-key", "app"]) as Record<string, string>;
+      const options = flags(rest, ["initiative", "api-key", "plugin"]) as Record<string, string>;
       const apiKey = options["api-key"] ?? process.env.INITIATIVE_API_KEY;
       if (!options.initiative || !apiKey) {
-        process.stderr.write("dev uploads the app to your deployment: give --initiative <url> and --api-key <key>\n");
+        process.stderr.write("dev uploads the plug-in to your deployment: give --initiative <url> and --api-key <key>\n");
         return 2;
       }
-      return dev({ root: process.cwd(), app: options.app ?? "src/app.ts", initiative: options.initiative, apiKey });
+      return dev({ root: process.cwd(), plugin: options.plugin ?? "src/plugin.ts", initiative: options.initiative, apiKey });
     }
     case "keygen":
       return keygen(rest);

@@ -37,7 +37,7 @@ let clock: number;
 beforeEach(() => {
   sent = [];
   issued = 0;
-  scope = "projects:write apps:acme.github";
+  scope = "projects:write plugins:acme.github";
   answers = new Map();
   clock = NOW;
 });
@@ -81,7 +81,7 @@ const initiative = () =>
 const tokenForms = () => sent.filter((one) => one.url === TOKEN_URL).map((one) => new URLSearchParams(one.body));
 
 describe("tokens", () => {
-  it("asks for an installation token with an assertion the app's key signed, addressed to the token endpoint", async () => {
+  it("asks for an installation token with an assertion the plug-in's key signed, addressed to the token endpoint", async () => {
     answers.set("GET /api/v1/plugin-platform/installation/config", () => json(200, { community_ref: "gapp_1" }));
     await initiative().asInstallation("gapp_1").config();
 
@@ -98,10 +98,10 @@ describe("tokens", () => {
   it("reuses a token until shortly before it expires, and shares one request between concurrent callers", async () => {
     answers.set("POST /api/v1/plugin-platform/installation/events", () => json(202, {}));
     const client = initiative().asInstallation("gapp_1");
-    await Promise.all([client.emitEvent({ eventType: "app.acme.tracker.x" }), client.emitEvent({ eventType: "app.acme.tracker.x" })]);
+    await Promise.all([client.emitEvent({ eventType: "plugin.acme.tracker.x" }), client.emitEvent({ eventType: "plugin.acme.tracker.x" })]);
     expect(issued).toBe(1);
     clock += 571_000;
-    await client.emitEvent({ eventType: "app.acme.tracker.x" });
+    await client.emitEvent({ eventType: "plugin.acme.tracker.x" });
     expect(issued).toBe(2);
   });
 
@@ -116,15 +116,15 @@ describe("tokens", () => {
 
   it("asks for a standing only when told to, and only where it applies", async () => {
     answers.set("GET /api/v1/c/0/projects/", () => json(200, []));
-    const app = initiative();
-    await app.asInstallation("gapp_1", { initiative: 42, level: "moderator" }).request("GET", "/projects/", { scope: "projects:read" });
-    await app.asInstallation("gapp_1", { level: "community_admin" }).request("GET", "/projects/", { scope: "projects:read" });
+    const plugin = initiative();
+    await plugin.asInstallation("gapp_1", { initiative: 42, level: "moderator" }).request("GET", "/projects/", { scope: "projects:read" });
+    await plugin.asInstallation("gapp_1", { level: "community_admin" }).request("GET", "/projects/", { scope: "projects:read" });
     expect(tokenForms().map((form) => [form.get("level"), form.get("resource")])).toEqual([
       ["moderator", "urn:initiative:initiative:42"],
       ["community_admin", null],
     ]);
-    expect(() => app.asInstallation("gapp_1", { level: "moderator" })).toThrow("narrowed to one initiative");
-    expect(() => app.asInstallation("gapp_1", { initiative: 42, level: "community_admin" })).toThrow("not narrowed");
+    expect(() => plugin.asInstallation("gapp_1", { level: "moderator" })).toThrow("narrowed to one initiative");
+    expect(() => plugin.asInstallation("gapp_1", { initiative: 42, level: "community_admin" })).toThrow("not narrowed");
   });
 
   it("acts for a member on the JWT-bearer grant, and says when they have not consented", async () => {
@@ -182,19 +182,19 @@ describe("calls", () => {
     expect(error).toMatchObject({ status: 409, detail: "PLUGIN_CHANNEL_CONNECTION_EXPIRED" });
   });
 
-  it("calls another app through Initiative, needing apps:<its public id>", async () => {
-    answers.set("POST /api/v1/plugin-platform/apps/acme.github/endpoints/app.acme.github.open-issue", () =>
-      json(200, { endpoint: "app.acme.github.open-issue", actor: "member", result: { number: 7 } })
+  it("calls another plug-in through Initiative, needing plugins:<its public id>", async () => {
+    answers.set("POST /api/v1/plugin-platform/plugins/acme.github/endpoints/plugin.acme.github.open-issue", () =>
+      json(200, { endpoint: "plugin.acme.github.open-issue", actor: "member", result: { number: 7 } })
     );
     const client = initiative().asMember("gapp_1", "uapp_alice");
-    const outcome = await client.callPlugin("acme.github", "app.acme.github.open-issue", { title: "x" });
+    const outcome = await client.callPlugin("acme.github", "plugin.acme.github.open-issue", { title: "x" });
     expect(outcome.result).toEqual({ number: 7 });
     expect(JSON.parse(sent.at(-1)!.body)).toEqual({ params: { title: "x" } });
-    await expect(client.callPlugin("acme.slack", "app.acme.slack.post")).rejects.toBeInstanceOf(MissingScopeError);
+    await expect(client.callPlugin("acme.slack", "plugin.acme.slack.post")).rejects.toBeInstanceOf(MissingScopeError);
   });
 });
 
-describe("the app API", () => {
+describe("the plug-in API", () => {
   const routes = () => sent.filter((one) => one.url !== TOKEN_URL).map((one) => `${one.method} ${one.url.slice(BASE.length)}`);
 
   it("sends a typed call's method, path, query and body under /c/0, and answers its body", async () => {
@@ -307,9 +307,9 @@ describe("the installation itself", () => {
     expect(await client.connections()).toMatchObject([{ connectionRef: "cref_a", accountLabel: "@a" }]);
     expect(await client.connectionToken("cref_ws")).toEqual({ accessToken: "vendor-token", expiresAt: 1_780_000_600_000 });
     expect(await client.reportConfigStatus({ state: "invalid", detail: "missing_scope" })).toMatchObject({ configState: "invalid" });
-    await client.emitEvent({ eventType: "app.acme.tracker.ticket-opened", payload: { number: 1 }, initiativeId: 5 });
+    await client.emitEvent({ eventType: "plugin.acme.tracker.ticket-opened", payload: { number: 1 }, initiativeId: 5 });
     expect(JSON.parse(sent.at(-1)!.body)).toEqual({
-      event_type: "app.acme.tracker.ticket-opened",
+      event_type: "plugin.acme.tracker.ticket-opened",
       payload: { number: 1 },
       initiative_id: 5,
     });

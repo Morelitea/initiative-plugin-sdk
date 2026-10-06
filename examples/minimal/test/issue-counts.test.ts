@@ -6,13 +6,13 @@
 import { describe, expect, it } from "vitest";
 import { runEndpoint } from "initiative-plugin-sdk/testing";
 
-import app from "../src/app.js";
+import plugin from "../src/plugin.js";
 import { render } from "../src/widgets/open-issues.js";
 import statistics from "./fixtures/issues-statistics.json" with { type: "json" };
 
 describe("issue-counts", () => {
   it("asks GitLab for the project's statistics, and maps the counts", async () => {
-    const run = await runEndpoint(app, "issue-counts", {
+    const run = await runEndpoint(plugin, "issue-counts", {
       params: { project: "gitlab-org/gitlab" },
       responses: [{ body: statistics }],
     });
@@ -30,7 +30,7 @@ describe("issue-counts", () => {
   });
 
   it("answers not-found for a project GitLab does not show the account", async () => {
-    const run = await runEndpoint(app, "issue-counts", {
+    const run = await runEndpoint(plugin, "issue-counts", {
       params: { project: "acme/secret" },
       responses: [{ status: 404, body: { message: "404 Project Not Found" } }],
     });
@@ -40,7 +40,7 @@ describe("issue-counts", () => {
 
 describe("the open-issues widget", () => {
   it("draws the open count", () => {
-    expect(render({ source: "app", rows: [], values: { opened: 12, closed: 30 } })).toEqual({
+    expect(render({ source: "plugin", rows: [], values: { opened: 12, closed: 30 } })).toEqual({
       v: 1,
       scene: { kind: "metric", value: 12, label: "Open issues", caption: "30 closed" },
     });

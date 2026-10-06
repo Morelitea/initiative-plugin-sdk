@@ -51,7 +51,7 @@ function claims(extra: Record<string, unknown> = {}): Record<string, unknown> {
 }
 
 const contextClaims = (extra: Record<string, unknown> = {}) =>
-  claims({ scope: "endpoint", endpoint_id: "app.acme.tracker.read", ...extra });
+  claims({ scope: "endpoint", endpoint_id: "plugin.acme.tracker.read", ...extra });
 
 const lifecycleClaims = (extra: Record<string, unknown> = {}) =>
   claims({ scope: "lifecycle", hook: "after_connect", ...extra });
@@ -78,7 +78,7 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 }
 
 describe("verifyContextToken", () => {
-  it("returns the claims of a token Initiative signed for this app", async () => {
+  it("returns the claims of a token Initiative signed for this plug-in", async () => {
     const { urls, fetchImpl } = jwksFetch();
     const token = signJwt(signing, contextClaims({ connection_refs: { account: "ref-1" } }), CONTEXT_TOKEN_TYPE);
     const verified = await verifyContextToken(token, options(fetchImpl));
@@ -86,13 +86,13 @@ describe("verifyContextToken", () => {
       community_ref: "gapp_abc",
       plugin_install_id: 7,
       scope: "endpoint",
-      endpoint_id: "app.acme.tracker.read",
+      endpoint_id: "plugin.acme.tracker.read",
       connection_refs: { account: "ref-1" },
     });
     expect(urls).toEqual([`${BASE}${JWKS_PATH}`]);
   });
 
-  it("names the calling app, the actor and the member on a call from another app", async () => {
+  it("names the calling plug-in, the actor and the member on a call from another plug-in", async () => {
     const { fetchImpl } = jwksFetch();
     const token = signJwt(
       signing,
@@ -123,8 +123,8 @@ describe("verifyContextToken", () => {
   it("refuses caller claims of the wrong shape", async () => {
     const { fetchImpl } = jwksFetch();
     for (const [extra, message] of [
-      [{ act: "acme.automations" }, "act names no calling app"],
-      [{ act: { sub: "" } }, "act names no calling app"],
+      [{ act: "acme.automations" }, "act names no calling plug-in"],
+      [{ act: { sub: "" } }, "act names no calling plug-in"],
       [{ actor: "robot" }, "unknown actor robot"],
       [{ actor: "member" }, "a member call names no member"],
       [{ initiative_id: 0 }, "initiative_id is not an initiative"],
@@ -143,11 +143,11 @@ describe("verifyContextToken", () => {
     expect(urls).toEqual([`${BASE}${JWKS_PATH}`]);
   });
 
-  it("refuses a token for another app", async () => {
+  it("refuses a token for another plug-in", async () => {
     const { fetchImpl } = jwksFetch();
-    const token = signJwt(signing, contextClaims({ aud: audienceFor("other.app") }), CONTEXT_TOKEN_TYPE);
+    const token = signJwt(signing, contextClaims({ aud: audienceFor("other.plugin") }), CONTEXT_TOKEN_TYPE);
     expect(await refusal(verifyContextToken(token, options(fetchImpl)))).toContain(
-      "initiative-plugin:other.app"
+      "initiative-plugin:other.plugin"
     );
   });
 
@@ -283,7 +283,7 @@ describe("verifyHandoffToken", () => {
 
   it("checks the audience like a context token", async () => {
     const { fetchImpl } = jwksFetch();
-    const token = signJwt(signing, handoffClaims({ aud: audienceFor("other.app") }), HANDOFF_TOKEN_TYPE);
+    const token = signJwt(signing, handoffClaims({ aud: audienceFor("other.plugin") }), HANDOFF_TOKEN_TYPE);
     await expect(verifyHandoffToken(token, options(fetchImpl))).rejects.toThrow(
       ContextTokenError
     );

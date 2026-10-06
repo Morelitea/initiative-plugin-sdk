@@ -1,4 +1,4 @@
-/** An app declaring one of everything, recording what each handler was handed. */
+/** A plug-in declaring one of everything, recording what each handler was handed. */
 
 import { definePlugin, defineEndpoint, type Call } from "../../src/manifest.js";
 import { EndpointError } from "../../src/server.js";
@@ -55,11 +55,11 @@ export function trackerPlugin() {
     identity: { kind: "ticket", key: ["number"] },
   });
 
-  const app = definePlugin({
+  const plugin = definePlugin({
     publicId: "acme.tracker",
     uid: "K7M2QX8N4TVB9C",
     name: "Tracker",
-    scopes: ["projects:read", "apps:acme.github"],
+    scopes: ["projects:read", "plugins:acme.github"],
     vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
     connections: {
       account: {
@@ -130,10 +130,10 @@ export function trackerPlugin() {
       },
     ],
   });
-  return { app, seen };
+  return { plugin, seen };
 }
 
-/** A declarative app using each of its terms: no handler, hook or service. */
+/** A declarative plug-in using each of its terms: no handler, hook or service. */
 export function issuesPlugin() {
   const api = (path: string) => JSON.stringify(`https://api.tracker.example${path}`);
 

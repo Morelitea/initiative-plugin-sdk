@@ -1,5 +1,5 @@
 /**
- * App keys: what is generated, and that a signature made with the private half
+ * Plug-in keys: what is generated, and that a signature made with the private half
  * verifies with the JWKS the operator registers.
  */
 

@@ -1,5 +1,5 @@
 /**
- * `scripts/generate-plugin-api.mjs`: what it refuses in an app API document.
+ * `scripts/generate-plugin-api.mjs`: what it refuses in a plug-in API document.
  */
 
 import { execFile } from "node:child_process";

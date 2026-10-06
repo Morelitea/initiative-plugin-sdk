@@ -2,7 +2,7 @@
 /**
  * Generate everything derived from `manifest.contract.json`.
  *
- * The contract is the one hand-authored statement of what an app manifest may
+ * The contract is the one hand-authored statement of what a plug-in manifest may
  * say: the vocabulary (enums, ladders, caps, character sets) and the shape (each
  * object's fields). Two things are generated from it and committed beside it:
  *
@@ -68,7 +68,7 @@ function charClass(name) {
 
 function pattern(name, form, prefix = "") {
   const cls = charClass(name);
-  // A literal prefix ahead of the class, such as a scope family's `apps:`.
+  // A literal prefix ahead of the class, such as a scope family's `plugins:`.
   // Letters and colons only, so it needs no escaping inside a pattern.
   for (const character of prefix) {
     if (!"abcdefghijklmnopqrstuvwxyz:".includes(character)) {
@@ -148,7 +148,7 @@ const plural = (name) => (/[^aeiou]y$/.test(name) ? `${name.slice(0, -1)}ies` : 
 function buildTypes() {
   const lines = [
     "/**",
-    " * The app contract, as TypeScript.",
+    " * The plug-in contract, as TypeScript.",
     " *",
     " * GENERATED from `manifest.contract.json` by `scripts/generate.mjs`. Do not",
     " * edit it: change the contract and run `npm run generate`.",

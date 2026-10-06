@@ -16,8 +16,8 @@
  * it adds one rule the platform does not check: an endpoint's `identity` must
  * name returns that endpoint actually sends.
  *
- * For a declarative app it also parses every JSONata expression, and checks
- * that an app is one kind or the other, what its requests and steps name, and
+ * For a declarative plug-in it also parses every JSONata expression, and checks
+ * that a plug-in is one kind or the other, what its requests and steps name, and
  * the hosts it calls.
  */
 
@@ -39,7 +39,7 @@ import {
 } from "./contract.js";
 import { ExpressionError, parseExpression } from "./expression.js";
 
-/** Where an app serves its manifest document. */
+/** Where a plug-in serves its manifest document. */
 export const MANIFEST_PATH = "/.well-known/initiative-plugin.json";
 
 /** The wire protocol this SDK speaks. */
@@ -47,7 +47,7 @@ export const PLUGIN_PROTOCOL_VERSION = 1;
 
 /**
  * The document served at {@link MANIFEST_PATH}, of which {@link Manifest} is one
- * field: the app's identity beside what it declares it can do. A registrar
+ * field: the plug-in's identity beside what it declares it can do. A registrar
  * refuses anything without a `protocol_version`, a `public_id`, a `kind` and a
  * `definition`.
  */
@@ -55,7 +55,7 @@ export interface PluginDocument {
   protocol_version: number;
   /** `<publisher>.<slug>`, the same id `definition.service.public_id` carries. */
   public_id: string;
-  kind: "app";
+  kind: "plugin";
   /** The catalog id: publisher-assigned, immutable, never reused. */
   uid?: string;
   name?: string;
@@ -73,7 +73,7 @@ export function pluginDocument(
   return {
     protocol_version: manifest.service?.protocol ?? PLUGIN_PROTOCOL_VERSION,
     public_id: manifest.service?.public_id ?? "",
-    kind: "app",
+    kind: "plugin",
     ...(options.uid ? { uid: options.uid } : {}),
     ...(options.name ? { name: options.name } : {}),
     definition: manifest,
@@ -83,7 +83,7 @@ export function pluginDocument(
 /**
  * Check a whole served document — the envelope, then the manifest inside it.
  *
- * {@link validateManifest} checks what an app declares; this checks what a
+ * {@link validateManifest} checks what a plug-in declares; this checks what a
  * registrar will actually fetch. Use it on the bytes you serve.
  */
 export function validateDocument(document: unknown): ValidationProblem[] {
@@ -100,10 +100,10 @@ export function validateDocument(document: unknown): ValidationProblem[] {
     });
   }
   if (typeof body.public_id !== "string" || !body.public_id.trim()) {
-    problems.push({ where: "/public_id", message: "a served document must name its app" });
+    problems.push({ where: "/public_id", message: "a served document must name its plug-in" });
   }
-  if (body.kind !== "app") {
-    problems.push({ where: "/kind", message: `must be '${"app"}'` });
+  if (body.kind !== "plugin") {
+    problems.push({ where: "/kind", message: `must be '${"plugin"}'` });
   }
   if (body.definition === undefined) {
     problems.push({
@@ -188,7 +188,7 @@ function schemaValidator(): ValidateFunction {
  * note — but a non-empty one is a definite refusal, so this is worth running in
  * CI and before a publish.
  *
- * A declarative app's manifest has no `service` block to name the app, so its
+ * A declarative plug-in's manifest has no `service` block to name the plug-in, so its
  * endpoint ids are checked against `publicId` when one is given.
  */
 export function validateManifest(manifest: unknown, options: { publicId?: string } = {}): ValidationProblem[] {
@@ -249,7 +249,7 @@ function summaryProblems(body: Manifest): ValidationProblem[] {
     return [
       {
         where: "/community_summary",
-        message: `'${id}' is not one of this app's endpoints`,
+        message: `'${id}' is not one of this plug-in's endpoints`,
       },
     ];
   }
@@ -286,7 +286,7 @@ function summaryProblems(body: Manifest): ValidationProblem[] {
  * others covered terms that told a consumer how to DRAW a parameter, and those
  * terms are gone. An identity is not one of them. It says what an operation
  * TOUCHED, which only you can know, and it is what lets a consumer keep a
- * change your app made from firing the automation that made it.
+ * change your plug-in made from firing the automation that made it.
  *
  * Kept apart from {@link referenceProblems} because those are early copies of
  * platform refusals and this is not: nothing downstream refuses an identity
@@ -390,7 +390,7 @@ function undeclaredProblems(body: Manifest): ValidationProblem[] {
  * blocks *before* it runs this cross-check, so `"automation": {}` never reaches
  * it and the feature reads as declared over nothing — refused. A manifest with
  * one validates locally under a presence test and is turned away at
- * registration, which has happened to a real app.
+ * registration, which has happened to a real plug-in.
  *
  * So an empty block is reported twice over, deliberately: once as the feature it
  * fails to back, and once on its own, because leaving it out is the fix either
@@ -455,7 +455,7 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
   // One namespace across every direction, which is what lets a caller resolve
   // an id without being told which kind of thing it is first.
   const owner = body.service?.public_id ?? publicId;
-  const prefix = `app.${owner}.`;
+  const prefix = `plugin.${owner}.`;
   const readable = new Set<string>();
   const declared = new Set<string>();
   // Kept by id so a parameter naming a source can be checked against what that
@@ -754,7 +754,7 @@ function webhookProblems(body: Manifest): ValidationProblem[] {
   if (!connection || connection.scope !== "static") {
     problems.push({
       where: "/webhooks/route/connection",
-      message: `'${connectionId}' is not a static connection this app declares`,
+      message: `'${connectionId}' is not a static connection this plug-in declares`,
     });
   } else if (!connection.fields.some((entry) => entry.key === field)) {
     problems.push({
@@ -822,10 +822,10 @@ function intervalProblems(every: string, where: string): ValidationProblem[] {
 const DECLARATIVE_TERMS = ["request", "steps", "map", "errors"] as const;
 
 /**
- * An app is one kind or the other. A declarative app — no `service` block —
+ * A plug-in is one kind or the other. A declarative plug-in — no `service` block —
  * names its hosts, and every read and write it offers is a request and a map:
  * there is no container for a handler, hook, schedule or surface to run in. A
- * container app uses none of the declarative terms.
+ * container plug-in uses none of the declarative terms.
  */
 function kindProblems(body: Manifest): ValidationProblem[] {
   const problems: ValidationProblem[] = [];
@@ -834,9 +834,9 @@ function kindProblems(body: Manifest): ValidationProblem[] {
   const connections = body.connections ?? [];
 
   if (body.service === undefined) {
-    if (!body.hosts) push("/hosts", "a declarative app (one with no service block) names the hosts it calls");
-    if (body.schedules) push("/schedules", "a declarative app has no schedules: they call a container's hook");
-    if (body.embeds) push("/embeds", "a declarative app has no surfaces: a surface is a container's page");
+    if (!body.hosts) push("/hosts", "a declarative plug-in (one with no service block) names the hosts it calls");
+    if (body.schedules) push("/schedules", "a declarative plug-in has no schedules: they call a container's hook");
+    if (body.embeds) push("/embeds", "a declarative plug-in has no surfaces: a surface is a container's page");
     endpoints.forEach((endpoint, index) => {
       const where = `/endpoints/${index}`;
       if (endpoint.direction === "emit") {
@@ -852,32 +852,32 @@ function kindProblems(body: Manifest): ValidationProblem[] {
     connections.forEach((connection, index) => {
       const where = `/connections/${index}/flow`;
       if (connection.flow?.after_connect === true) {
-        push(`${where}/after_connect`, "a declarative app gives after_connect's request and map: there is no hook to call");
+        push(`${where}/after_connect`, "a declarative plug-in gives after_connect's request and map: there is no hook to call");
       }
-      if (connection.flow?.revoke === "hook") push(`${where}/revoke`, "a declarative app has no revoke hook");
+      if (connection.flow?.revoke === "hook") push(`${where}/revoke`, "a declarative plug-in has no revoke hook");
     });
     if (body.webhooks && !body.webhooks.events && !body.webhooks.status) {
-      push("/webhooks", "a declarative app maps deliveries with 'events' or 'status': there is no hook to forward them to");
+      push("/webhooks", "a declarative plug-in maps deliveries with 'events' or 'status': there is no hook to forward them to");
     }
   } else {
     for (const key of ["hosts", "auth"] as const) {
-      if (body[key] !== undefined) push(`/${key}`, `'${key}' is a declarative app's term; a container app makes its own calls`);
+      if (body[key] !== undefined) push(`/${key}`, `'${key}' is a declarative plug-in's term; a container plug-in makes its own calls`);
     }
     endpoints.forEach((endpoint, index) => {
       for (const key of DECLARATIVE_TERMS) {
         if (endpoint[key] !== undefined) {
-          push(`/endpoints/${index}/${key}`, "a container app's endpoint is answered by its handler");
+          push(`/endpoints/${index}/${key}`, "a container plug-in's endpoint is answered by its handler");
         }
       }
     });
     connections.forEach((connection, index) => {
       if (typeof connection.flow?.after_connect === "object") {
-        push(`/connections/${index}/flow/after_connect`, "a container app sets after_connect true and answers it in its hook");
+        push(`/connections/${index}/flow/after_connect`, "a container plug-in sets after_connect true and answers it in its hook");
       }
-      if (connection.health) push(`/connections/${index}/health`, "health is a declarative app's: a container checks its own connections");
+      if (connection.health) push(`/connections/${index}/health`, "health is a declarative plug-in's: a container checks its own connections");
     });
     for (const key of ["events", "status"] as const) {
-      if (body.webhooks?.[key]) push(`/webhooks/${key}`, "a container app's webhook hook receives each delivery");
+      if (body.webhooks?.[key]) push(`/webhooks/${key}`, "a container plug-in's webhook hook receives each delivery");
     }
   }
   return problems;
@@ -910,7 +910,7 @@ function wellFormedHost(host: string): boolean {
 }
 
 /**
- * What a declarative app's terms say: every expression parses, every request
+ * What a declarative plug-in's terms say: every expression parses, every request
  * names what it may, a request on a member's connection is named in the
  * endpoint's `requires`, steps read only the steps before them, every event emits
  * a declared emission, and each refusal names a code the endpoint has.
@@ -963,7 +963,7 @@ function declarativeProblems(body: Manifest): ValidationProblem[] {
     } else if (!owned && value.connection === undefined) {
       push(where, "names the connection whose credential it carries");
     } else if (value.connection !== undefined && !connectionIds.has(value.connection)) {
-      push(`${where}/connection`, `'${value.connection}' is not a connection this app declares`);
+      push(`${where}/connection`, `'${value.connection}' is not a connection this plug-in declares`);
     }
     const paging = value.paging;
     if (paging) {
@@ -1051,13 +1051,13 @@ function declarativeProblems(body: Manifest): ValidationProblem[] {
     const where = `/webhooks/events/${index}`;
     expression(event.when, `${where}/when`);
     expression(event.map, `${where}/map`);
-    if (!emits.has(event.emit)) push(`${where}/emit`, `'${event.emit}' is not an emit endpoint this app declares`);
+    if (!emits.has(event.emit)) push(`${where}/emit`, `'${event.emit}' is not an emit endpoint this plug-in declares`);
   });
   (body.webhooks?.status ?? []).forEach((row, index) => {
     const where = `/webhooks/status/${index}`;
     expression(row.when, `${where}/when`);
     if (!connectionIds.has(row.connection)) {
-      push(`${where}/connection`, `'${row.connection}' is not a connection this app declares`);
+      push(`${where}/connection`, `'${row.connection}' is not a connection this plug-in declares`);
     }
     if (row.state === "unavailable") {
       push(`${where}/state`, "a delivery says a connection is ok, suspended or removed");

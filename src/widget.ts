@@ -39,7 +39,7 @@ type SingleKey<R> = Exclude<keyof R, ListKey<R>>;
  * declaration, as `defineEndpoint` gave it.
  */
 export interface WidgetData<E> {
-  source: "app";
+  source: "plugin";
   /** One entry per index across the endpoint's `list` returns, keyed by their names. */
   rows: Array<{ [K in ListKey<Returns<E>>]?: Scalar<TypeOf<Returns<E>[K]>> }>;
   /** The endpoint's single-valued returns, once. */

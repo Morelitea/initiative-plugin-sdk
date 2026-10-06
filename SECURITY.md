@@ -22,7 +22,7 @@ Email **security@morelitea.com** with:
 
 ## Scope
 
-This repository covers the shared package apps build against. Reports about its own code, its configuration, and
+This repository covers the shared package plug-ins build against. Reports about its own code, its configuration, and
 its GitHub Actions workflows are all in scope.
 
 Third-party dependencies are out of scope as such, but a report that a

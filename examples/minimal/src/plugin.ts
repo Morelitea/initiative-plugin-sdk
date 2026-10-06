@@ -1,5 +1,5 @@
 /**
- * A declarative app: one read Initiative makes to GitLab for a community, and
+ * A declarative plug-in: one read Initiative makes to GitLab for a community, and
  * a widget that draws it on a dashboard. Nothing of it runs anywhere:
  * Initiative makes the call with the community's GitLab connection and maps
  * the answer itself.

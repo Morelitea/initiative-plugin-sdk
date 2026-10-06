@@ -1,18 +1,18 @@
 /**
- * The app's server: every route Initiative calls, answered from the app's
+ * The plug-in's server: every route Initiative calls, answered from the plug-in's
  * definition.
  *
  * | Route | Who calls it |
  * |---|---|
  * | `GET /healthz`, `GET /readyz` | the container runtime |
- * | `GET /.well-known/jwks.json` | a deployment that registers the app's key by address |
- * | `GET /.well-known/initiative-plugin.json` | a deployment reading the app's manifest document |
+ * | `GET /.well-known/jwks.json` | a deployment that registers the plug-in's key by address |
+ * | `GET /.well-known/initiative-plugin.json` | a deployment reading the plug-in's manifest document |
  * | `GET, POST /v1/endpoints` | Initiative, with a context token |
  * | `POST /v1/hooks/{name}` | Initiative, with a lifecycle token |
  * | a surface's path | a member's browser, inside Initiative's frame |
  *
  * {@link createPlugin} returns a web-standard handler, `(Request) => Promise<Response>`,
- * so the same app runs on any runtime that speaks `Request` and `Response`.
+ * so the same plug-in runs on any runtime that speaks `Request` and `Response`.
  * {@link serve} runs it on `node:http`.
  */
 
@@ -89,10 +89,10 @@ export interface Logger {
 }
 
 export type PluginOptions = {
-  /** Initiative's API base as the app reaches it. Default: `INITIATIVE_BASE_URL`. */
+  /** Initiative's API base as the plug-in reaches it. Default: `INITIATIVE_BASE_URL`. */
   baseUrl?: string;
   /**
-   * The app's key: a PEM, a PEM with literal `\n`, or base64 of the PEM, and
+   * The plug-in's key: a PEM, a PEM with literal `\n`, or base64 of the PEM, and
    * the `kid` it is registered under (default: its thumbprint). Default:
    * `INITIATIVE_PLUGIN_PRIVATE_KEY` and `INITIATIVE_PLUGIN_KEY_ID`, else a key
    * generated on first start and kept in `dataDir`.
@@ -120,12 +120,12 @@ const consoleLogger: Logger = {
 
 class TooLarge extends Error {}
 
-/** The app's server, as a web-standard handler. */
+/** The plug-in's server, as a web-standard handler. */
 export function createPlugin(
-  app: AnyPlugin,
+  plugin: AnyPlugin,
   ...[options = {} as PluginOptions]: {} extends PluginContext ? [PluginOptions?] : [PluginOptions]
 ): PluginHandler {
-  if (app.hosts) throw new TypeError("a declarative app has no service to run: Initiative answers it from its manifest");
+  if (plugin.hosts) throw new TypeError("a declarative plug-in has no service to run: Initiative answers it from its manifest");
   const env = options.env ?? process.env;
   const baseUrl = options.baseUrl ?? env.INITIATIVE_BASE_URL;
   if (!baseUrl) throw new TypeError("Initiative's address is required: set INITIATIVE_BASE_URL");
@@ -134,20 +134,20 @@ export function createPlugin(
   const now = options.now ?? Date.now;
   const context = (options.context ?? {}) as PluginContext;
   const key = pluginKey(options, env);
-  const manifest = builtManifest(app, options.manifest);
-  const document = JSON.stringify(pluginDocument(manifest, { uid: app.uid, name: app.name }));
+  const manifest = builtManifest(plugin, options.manifest);
+  const document = JSON.stringify(pluginDocument(manifest, { uid: plugin.uid, name: plugin.name }));
   const served = publicJwks(key);
-  for (const jwk of served.keys) log.info(`app key fingerprint: ${jwkThumbprint(jwk)} (kid ${jwk.kid})`);
+  for (const jwk of served.keys) log.info(`plug-in key fingerprint: ${jwkThumbprint(jwk)} (kid ${jwk.kid})`);
   const jwks = JSON.stringify(served);
 
-  const initiative = new Initiative({ baseUrl, publicId: app.publicId, key, fetch: fetchImpl, now });
-  const verify: VerifyOptions = { publicId: app.publicId, baseUrl, jwks: new JwksCache({ fetchImpl, now }), now };
+  const initiative = new Initiative({ baseUrl, publicId: plugin.publicId, key, fetch: fetchImpl, now });
+  const verify: VerifyOptions = { publicId: plugin.publicId, baseUrl, jwks: new JwksCache({ fetchImpl, now }), now };
   const endpoints = new Map<string, Exclude<EndpointDeclaration, { map: string }>>(
-    Object.entries(app.endpoints ?? {}).flatMap(([name, endpoint]) =>
-      "map" in endpoint ? [] : [[endpointId(app, name), endpoint] as const]
+    Object.entries(plugin.endpoints ?? {}).flatMap(([name, endpoint]) =>
+      "map" in endpoint ? [] : [[endpointId(plugin, name), endpoint] as const]
     )
   );
-  const surfaces = Object.entries(app.surfaces ?? {}).filter(([, surface]) => surface.handler);
+  const surfaces = Object.entries(plugin.surfaces ?? {}).filter(([, surface]) => surface.handler);
   const spent = new Map<string, number>();
 
   const base = (installation: string, narrowing: { initiative?: number } = {}): Call => ({
@@ -164,7 +164,7 @@ export function createPlugin(
     if (typeof raw.endpoint !== "string" || !raw.endpoint) return refuse(400, "invalid-request", "endpoint is required");
     const id = raw.endpoint;
     const endpoint = endpoints.get(id);
-    if (!endpoint) return refuse(400, "invalid-request", `this app does not offer '${id}'`);
+    if (!endpoint) return refuse(400, "invalid-request", `this plug-in does not offer '${id}'`);
     if (endpoint.direction === "emit") {
       return refuse(400, "invalid-request", `'${id}' is emitted rather than called — subscribe to it instead`);
     }
@@ -179,7 +179,7 @@ export function createPlugin(
       if (!endpoint.public) return refuse(403, "endpoint-not-public");
       if (!claims.actor || !endpoint.actors?.includes(claims.actor)) return refuse(403, "actor-not-supported");
     } else if (endpoint.direction === "write") {
-      return refuse(403, "actor-not-supported", "a write is called by another app, as one of its actors");
+      return refuse(403, "actor-not-supported", "a write is called by another plug-in, as one of its actors");
     }
 
     const initiativeId = claims.initiative_id;
@@ -210,8 +210,8 @@ export function createPlugin(
   async function hook(request: Request, name: string): Promise<Response> {
     const known =
       name === "schedule"
-        ? Object.keys(app.schedules ?? {}).length > 0
-        : (name === "after_connect" || name === "revoke" || name === "webhook") && app.hooks?.[name] !== undefined;
+        ? Object.keys(plugin.schedules ?? {}).length > 0
+        : (name === "after_connect" || name === "revoke" || name === "webhook") && plugin.hooks?.[name] !== undefined;
     if (!known) return refuse(404, "not-found", "no such hook");
     const claims = await verified(request, (token) => verifyLifecycleToken(token, { ...verify, hook: name }));
     if (claims instanceof Response) return claims;
@@ -220,10 +220,10 @@ export function createPlugin(
     const subject = name === "schedule" ? "schedule" : "connection";
     if (typeof raw[subject] !== "string" || !raw[subject]) return refuse(400, "invalid-request", `${subject} is required`);
     const call = base(claims.community_ref);
-    const hooks = app.hooks ?? {};
+    const hooks = plugin.hooks ?? {};
 
     if (name === "schedule") {
-      const schedule = app.schedules?.[raw.schedule as string];
+      const schedule = plugin.schedules?.[raw.schedule as string];
       if (!schedule) return refuse(404, "not-found", `no schedule '${raw.schedule}'`);
       const done = await answered(
         () => schedule.run({ ...call, schedule: raw.schedule as string, since: optionalString(raw.since) }),
@@ -330,7 +330,7 @@ export function createPlugin(
 }
 
 /**
- * The app's handler on `node:http`, listening on `port` (default: `PORT`, else
+ * The plug-in's handler on `node:http`, listening on `port` (default: `PORT`, else
  * 8080). Close the returned server to stop.
  */
 export function serve(handler: PluginHandler, options: { port?: number; hostname?: string } = {}): Server {
@@ -366,7 +366,7 @@ function headersOf(incoming: IncomingHttpHeaders): Headers {
   return headers;
 }
 
-/** The app's key: given, from the environment, or generated once and kept. */
+/** The plug-in's key: given, from the environment, or generated once and kept. */
 function pluginKey(options: PluginOptions, env: Record<string, string | undefined>): PluginSigningKey {
   const given = options.key?.privateKey ?? env.INITIATIVE_PLUGIN_PRIVATE_KEY;
   if (given) return loadPrivateKey(pemText(given), options.key?.kid ?? env.INITIATIVE_PLUGIN_KEY_ID);
@@ -385,19 +385,19 @@ function pemText(raw: string): string {
 }
 
 /**
- * The manifest the app serves: what `initiative-plugin build` wrote, held to the
+ * The manifest the plug-in serves: what `initiative-plugin build` wrote, held to the
  * definition so a stale build is refused at start.
  */
-function builtManifest(app: AnyPlugin, given: Manifest | undefined): Manifest {
+function builtManifest(plugin: AnyPlugin, given: Manifest | undefined): Manifest {
   const path = "manifest.json";
   const built: Manifest | undefined = given ?? (existsSync(path) ? JSON.parse(readFileSync(path, "utf-8")) : undefined);
   if (!built) {
-    if (Object.keys(app.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-plugin build");
-    return manifestOf(app);
+    if (Object.keys(plugin.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-plugin build");
+    return manifestOf(plugin);
   }
   const modules = Object.fromEntries((built.widgets ?? []).map((widget) => [widget.id, widget.module_source]));
-  if (JSON.stringify(manifestOf(app, modules)) !== JSON.stringify(built)) {
-    throw new Error("manifest.json does not match the app's definition: run initiative-plugin build");
+  if (JSON.stringify(manifestOf(plugin, modules)) !== JSON.stringify(built)) {
+    throw new Error("manifest.json does not match the plug-in's definition: run initiative-plugin build");
   }
   return built;
 }

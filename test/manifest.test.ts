@@ -20,7 +20,7 @@ import {
 import { pluginDocument } from "../src/validate.js";
 import { SCOPES } from "../src/contract.js";
 import { manifestOf } from "../src/define.js";
-import { issuesPlugin } from "./support/app.js";
+import { issuesPlugin } from "./support/plugin.js";
 
 const base = (): Manifest => ({
   plugin_kind: "service",
@@ -71,7 +71,7 @@ describe("the schema actually runs", () => {
     const problems = validateManifest({
       ...base(),
       features: ["endpoints"],
-      endpoints: [{ id: "app.acme.tracker.thing", direction: "write", actors: [] }],
+      endpoints: [{ id: "plugin.acme.tracker.thing", direction: "write", actors: [] }],
     });
     expect(problems.length).toBeGreaterThan(0);
     expect(problems[0].where).toContain("/endpoints/0/actors");
@@ -84,7 +84,7 @@ describe("the schema actually runs", () => {
     const problems = validateManifest({
       ...base(),
       features: ["endpoints"],
-      endpoints: [{ id: "app.acme.tracker.thing" }],
+      endpoints: [{ id: "plugin.acme.tracker.thing" }],
     });
     expect(problems.length).toBeGreaterThan(0);
     expect(problems[0].where).toContain("/endpoints/0");
@@ -122,7 +122,7 @@ describe("the schema actually runs", () => {
       const problems = validateManifest({
         ...base(),
         features: ["endpoints"],
-        endpoints: [{ id: "app.acme.tracker.s", direction: "read", requires }],
+        endpoints: [{ id: "plugin.acme.tracker.s", direction: "read", requires }],
       });
       expect(problems.length).toBeGreaterThan(0);
       expect(problems.every((p) => p.where.endsWith("/requires"))).toBe(true);
@@ -159,7 +159,7 @@ describe("features cross-check", () => {
   it("catches a block whose feature was never declared", () => {
     const problems = validateManifest({
       ...base(),
-      endpoints: [{ id: "app.acme.tracker.issues", direction: "read" }],
+      endpoints: [{ id: "plugin.acme.tracker.issues", direction: "read" }],
     });
     expect(problems).toHaveLength(1);
     expect(problems[0].message).toContain("not declared");
@@ -170,7 +170,7 @@ describe("features cross-check", () => {
       validateManifest({
         ...base(),
         features: ["endpoints"],
-        endpoints: [{ id: "app.acme.tracker.issues", direction: "read" }],
+        endpoints: [{ id: "plugin.acme.tracker.issues", direction: "read" }],
       })
     ).toEqual([]);
   });
@@ -188,8 +188,8 @@ describe("references", () => {
     const problems = validateManifest({
       ...base(),
       features: ["widgets", "endpoints"],
-      endpoints: [{ id: "app.acme.tracker.known", direction: "read" }],
-      widgets: [widget(["app.acme.tracker.absent"])],
+      endpoints: [{ id: "plugin.acme.tracker.known", direction: "read" }],
+      widgets: [widget(["plugin.acme.tracker.absent"])],
     });
     expect(problems).toHaveLength(1);
     expect(problems[0].message).toContain("not a declared read endpoint");
@@ -203,8 +203,8 @@ describe("references", () => {
       const problems = validateManifest({
         ...base(),
         features: ["widgets", "endpoints"],
-        endpoints: [{ id: "app.acme.tracker.act", direction }],
-        widgets: [widget(["app.acme.tracker.act"])],
+        endpoints: [{ id: "plugin.acme.tracker.act", direction }],
+        widgets: [widget(["plugin.acme.tracker.act"])],
       });
       expect(problems).toHaveLength(1);
       expect(problems[0].message).toContain("not a declared read endpoint");
@@ -216,7 +216,7 @@ describe("references", () => {
       ...base(),
       features: ["endpoints"],
       endpoints: [
-        { id: "app.acme.tracker.s", direction: "read", requires: { all_of: ["nope"] } },
+        { id: "plugin.acme.tracker.s", direction: "read", requires: { all_of: ["nope"] } },
       ],
     });
     expect(problems).toHaveLength(1);
@@ -224,16 +224,16 @@ describe("references", () => {
   });
 
   it("catches an endpoint namespaced under somebody else", () => {
-    // Two apps offering `create-issue` would be two different things under one
+    // Two plug-ins offering `create-issue` would be two different things under one
     // name, and a caller resolving the wrong one would do the wrong thing
     // successfully — which is worse than an error.
     const problems = validateManifest({
       ...base(),
       features: ["endpoints"],
-      endpoints: [{ id: "app.someone-else.thing", direction: "read" }],
+      endpoints: [{ id: "plugin.someone-else.thing", direction: "read" }],
     });
     expect(problems).toHaveLength(1);
-    expect(problems[0].message).toContain("app.acme.tracker.");
+    expect(problems[0].message).toContain("plugin.acme.tracker.");
   });
 
   it("catches an id declared twice", () => {
@@ -243,8 +243,8 @@ describe("references", () => {
       ...base(),
       features: ["endpoints"],
       endpoints: [
-        { id: "app.acme.tracker.thing", direction: "read" },
-        { id: "app.acme.tracker.thing", direction: "write" },
+        { id: "plugin.acme.tracker.thing", direction: "read" },
+        { id: "plugin.acme.tracker.thing", direction: "write" },
       ],
     });
     expect(problems).toHaveLength(1);
@@ -266,15 +266,15 @@ describe("references", () => {
         ],
         endpoints: [
           {
-            id: "app.acme.tracker.issues",
+            id: "plugin.acme.tracker.issues",
             direction: "read",
             requires: { all_of: ["api"] },
             actors: ["member"],
           },
-          { id: "app.acme.tracker.issue-open", direction: "write", actors: ["member"] },
-          { id: "app.acme.tracker.issue-opened", direction: "emit" },
+          { id: "plugin.acme.tracker.issue-open", direction: "write", actors: ["member"] },
+          { id: "plugin.acme.tracker.issue-opened", direction: "emit" },
         ],
-        widgets: [widget(["app.acme.tracker.issues"])],
+        widgets: [widget(["plugin.acme.tracker.issues"])],
       })
     ).toEqual([]);
   });
@@ -288,17 +288,17 @@ describe("shape", () => {
 });
 
 describe("the document a registrar actually fetches", () => {
-  // The distinction this whole block exists for: a `Manifest` is what an app
+  // The distinction this whole block exists for: a `Manifest` is what a plug-in
   // declares, and a registrar never fetches one. It fetches the document around
   // it, and refuses anything without the envelope. A bare manifest served at
   // the well-known path is well-formed and unregisterable — which is exactly
-  // how the reference app was wrong, with nothing on either side saying so.
+  // how the reference plug-in was wrong, with nothing on either side saying so.
   it("wraps a manifest in the envelope a registrar requires", () => {
     const document = pluginDocument(base(), { uid: "K7M2QX8N4TVB9C", name: "Tracker" });
 
     expect(document.protocol_version).toBe(1);
     expect(document.public_id).toBe("acme.tracker");
-    expect(document.kind).toBe("app");
+    expect(document.kind).toBe("plugin");
     expect(document.uid).toBe("K7M2QX8N4TVB9C");
     expect(document.definition).toEqual(base());
   });
@@ -327,14 +327,14 @@ describe("the document a registrar actually fetches", () => {
     expect(messages(problems)).toContain("/protocol_version");
   });
 
-  it("refuses a kind that is not an app", () => {
+  it("refuses a kind that is not a plug-in", () => {
     const problems = validateDocument({ ...pluginDocument(base()), kind: "tool" });
     expect(messages(problems)).toContain("/kind");
   });
 
   it("catches the two public ids disagreeing", () => {
     // The registration is matched by the outer id and the capabilities are
-    // namespaced under the inner one, so a mismatch is a real app that half
+    // namespaced under the inner one, so a mismatch is a real plug-in that half
     // works, and nothing downstream reports it.
     const problems = validateDocument({ ...pluginDocument(base()), public_id: "acme.other" });
 
@@ -350,7 +350,7 @@ describe("the document a registrar actually fetches", () => {
 
 describe("an empty block is no block", () => {
   // The platform's normalizer drops empty blocks before the cross-check, so a
-  // presence test passes a manifest that registration refuses. A real app hit
+  // presence test passes a manifest that registration refuses. A real plug-in hit
   // exactly this: it declared a feature over an empty block, validated locally
   // under a presence test, and was turned away at registration.
   it("refuses a feature backed by an empty block", () => {
@@ -372,7 +372,7 @@ describe("an empty block is no block", () => {
     const problems = validateManifest({
       ...base(),
       features: ["endpoints"],
-      endpoints: [{ id: "app.acme.tracker.thing-happened", direction: "emit" }],
+      endpoints: [{ id: "plugin.acme.tracker.thing-happened", direction: "emit" }],
     });
 
     expect(problems).toEqual([]);
@@ -384,7 +384,7 @@ describe("what an endpoint says about itself", () => {
     ({
       ...base(),
       features: ["endpoints"],
-      endpoints: [{ id: "app.acme.tracker.thing", ...endpoint }],
+      endpoints: [{ id: "plugin.acme.tracker.thing", ...endpoint }],
     }) as Manifest;
 
   it("accepts a fully described one", () => {
@@ -489,7 +489,7 @@ describe("what an endpoint says about itself", () => {
  * The others said how to DRAW a parameter, and they are gone: a manifest
  * describes an API, and a consumer that writes its own steps needs nothing
  * from one to draw them. An identity is different in kind — it says what an
- * operation TOUCHED, which only the app can know.
+ * operation TOUCHED, which only the plug-in can know.
  */
 describe("what an automation consumer will read", () => {
   const withEndpoints = (...endpoints: Endpoint[]): Manifest => ({
@@ -501,7 +501,7 @@ describe("what an automation consumer will read", () => {
   it("accepts an identity naming its own single-valued returns", () => {
     const problems = validateManifest(
       withEndpoints({
-        id: "app.acme.tracker.open",
+        id: "plugin.acme.tracker.open",
         direction: "write",
         returns: [
           { key: "repository", type: "string", label: { en: "R" } },
@@ -518,7 +518,7 @@ describe("what an automation consumer will read", () => {
     // suppression looks configured, and a fire is silently dropped.
     const problems = validateManifest(
       withEndpoints({
-        id: "app.acme.tracker.open",
+        id: "plugin.acme.tracker.open",
         direction: "write",
         returns: [{ key: "number", type: "int", label: { en: "N" } }],
         identity: { kind: "issue", key: ["repository", "number"] },
@@ -530,7 +530,7 @@ describe("what an automation consumer will read", () => {
   it("refuses an identity naming a list", () => {
     const problems = validateManifest(
       withEndpoints({
-        id: "app.acme.tracker.open",
+        id: "plugin.acme.tracker.open",
         direction: "write",
         returns: [{ key: "numbers", type: "int", label: { en: "N" }, list: true }],
         identity: { kind: "issue", key: ["numbers"] },
@@ -542,7 +542,7 @@ describe("what an automation consumer will read", () => {
   it("refuses an identity on a read", () => {
     const problems = validateManifest(
       withEndpoints({
-        id: "app.acme.tracker.get",
+        id: "plugin.acme.tracker.get",
         direction: "read",
         returns: [{ key: "number", type: "int", label: { en: "N" } }],
         identity: { kind: "issue", key: ["number"] },
@@ -556,7 +556,7 @@ describe("what an automation consumer will read", () => {
     // went: a caller building a request has to know whether this takes an array.
     const problems = validateManifest(
       withEndpoints({
-        id: "app.acme.tracker.label",
+        id: "plugin.acme.tracker.label",
         direction: "write",
         params: [{ key: "labels", type: "string", label: { en: "Labels" }, list: true }],
       })
@@ -570,7 +570,7 @@ describe("what an automation consumer will read", () => {
     // nothing — which looks exactly like a vendor being slow. So this is where
     // an author finds out.
     const source: Endpoint = {
-      id: "app.acme.tracker.list-repositories",
+      id: "plugin.acme.tracker.list-repositories",
       direction: "read",
       returns: [
         { key: "names", type: "string", list: true },
@@ -582,7 +582,7 @@ describe("what an automation consumer will read", () => {
       messages(
         validateManifest(
           withEndpoints(source, {
-            id: "app.acme.tracker.find-issues",
+            id: "plugin.acme.tracker.find-issues",
             direction: "read",
             params: [
               { key: "repo", type: "string", label: { en: "Repo" }, options_from },
@@ -592,22 +592,22 @@ describe("what an automation consumer will read", () => {
       );
 
     expect(
-      asking({ endpoint: "app.acme.tracker.list-repositories", key: "names" })
+      asking({ endpoint: "plugin.acme.tracker.list-repositories", key: "names" })
     ).toBe("");
 
-    expect(asking({ endpoint: "app.acme.tracker.nope", key: "names" })).toContain(
+    expect(asking({ endpoint: "plugin.acme.tracker.nope", key: "names" })).toContain(
       "does not declare"
     );
 
     expect(
-      asking({ endpoint: "app.acme.tracker.list-repositories", key: "titles" })
+      asking({ endpoint: "plugin.acme.tracker.list-repositories", key: "titles" })
     ).toContain("is not returned by");
 
     // A return it does send, but one of them. A menu comes from a column of
     // values, and a consumer reading a scalar where it expected one has
     // nowhere to put it.
     expect(
-      asking({ endpoint: "app.acme.tracker.list-repositories", key: "owner" })
+      asking({ endpoint: "plugin.acme.tracker.list-repositories", key: "owner" })
     ).toContain("single value");
   });
 
@@ -617,7 +617,7 @@ describe("what an automation consumer will read", () => {
     // answer would have to offer the whole account's labels, which for anybody
     // with more than one repository is not a menu.
     const source: Endpoint = {
-      id: "app.acme.tracker.list-labels",
+      id: "plugin.acme.tracker.list-labels",
       direction: "read",
       params: [{ key: "repo", type: "string", label: { en: "Repo" } }],
       returns: [{ key: "names", type: "string", list: true }],
@@ -627,7 +627,7 @@ describe("what an automation consumer will read", () => {
       messages(
         validateManifest(
           withEndpoints(source, {
-            id: "app.acme.tracker.label",
+            id: "plugin.acme.tracker.label",
             direction: "write",
             params: [
               { key: "repo", type: "string", label: { en: "Repo" } },
@@ -637,7 +637,7 @@ describe("what an automation consumer will read", () => {
                 label: { en: "Labels" },
                 list: true,
                 options_from: {
-                  endpoint: "app.acme.tracker.list-labels",
+                  endpoint: "plugin.acme.tracker.list-labels",
                   key: "names",
                   needs,
                 },
@@ -666,12 +666,12 @@ describe("what an automation consumer will read", () => {
     const problems = validateManifest(
       withEndpoints(
         {
-          id: "app.acme.tracker.open-issue",
+          id: "plugin.acme.tracker.open-issue",
           direction: "write",
           returns: [{ key: "names", type: "string", list: true }],
         },
         {
-          id: "app.acme.tracker.find-issues",
+          id: "plugin.acme.tracker.find-issues",
           direction: "read",
           params: [
             {
@@ -679,7 +679,7 @@ describe("what an automation consumer will read", () => {
               type: "string",
               label: { en: "Repo" },
               options_from: {
-                endpoint: "app.acme.tracker.open-issue",
+                endpoint: "plugin.acme.tracker.open-issue",
                 key: "names",
               },
             },
@@ -692,7 +692,7 @@ describe("what an automation consumer will read", () => {
 
   it("has nowhere left to say how a parameter should be DRAWN", () => {
     // The rule this whole shape exists to keep. A term here for a control, a
-    // default or a bound would let an app define somebody else's product
+    // default or a bound would let a plug-in define somebody else's product
     // surface — and could still only express what that consumer had already
     // thought of.
     //
@@ -701,7 +701,7 @@ describe("what an automation consumer will read", () => {
     // never "how should it look": a name, a type, whether it is needed, how many
     // of them, and the two that say where the permitted ones come from —
     // `options` for a set that is the same on every deployment, `options_from`
-    // for one only the app can know.
+    // for one only the plug-in can know.
     const param = (manifestSchema().$defs as Record<string, any>).endpointParam;
     expect(Object.keys(param.properties).sort()).toEqual(
       ["key", "label", "list", "options", "options_from", "required", "type"].sort()
@@ -721,10 +721,10 @@ describe("community_summary", () => {
   const summary = (over: Partial<Endpoint> = {}): Manifest => ({
     ...base(),
     features: ["endpoints"],
-    community_summary: "app.acme.tracker.standing",
+    community_summary: "plugin.acme.tracker.standing",
     endpoints: [
       {
-        id: "app.acme.tracker.standing",
+        id: "plugin.acme.tracker.standing",
         direction: "read",
         returns: [{ key: "used", type: "int" }],
         ...over,
@@ -736,9 +736,9 @@ describe("community_summary", () => {
     expect(validateManifest(summary())).toEqual([]);
   });
 
-  it("refuses an endpoint this app does not have", () => {
-    const problems = validateManifest({ ...summary(), community_summary: "app.acme.tracker.nope" });
-    expect(messages(problems)).toContain("not one of this app's endpoints");
+  it("refuses an endpoint this plug-in does not have", () => {
+    const problems = validateManifest({ ...summary(), community_summary: "plugin.acme.tracker.nope" });
+    expect(messages(problems)).toContain("not one of this plug-in's endpoints");
   });
 
   it("refuses one that is not a read", () => {
@@ -780,13 +780,13 @@ describe("community_summary", () => {
   });
 
   it("is optional", () => {
-    // Most apps have no standing with a community to report, and saying nothing is
+    // Most plug-ins have no standing with a community to report, and saying nothing is
     // the ordinary case rather than an omission.
     expect(validateManifest(base())).toEqual([]);
   });
 });
 
-describe("the scopes an app asks for", () => {
+describe("the scopes a plug-in asks for", () => {
   const asking = (scopes: unknown) =>
     validateManifest({ ...base(), service: { public_id: "acme.tracker", scopes } } as never);
 
@@ -818,12 +818,12 @@ describe("the scopes an app asks for", () => {
     expect(asking("projects:read").length).toBeGreaterThan(0);
   });
 
-  it("takes the scope that lets it call another app", () => {
-    expect(messages(asking(["projects:read", "apps:acme.github"]))).toBe("");
+  it("takes the scope that lets it call another plug-in", () => {
+    expect(messages(asking(["projects:read", "plugins:acme.github"]))).toBe("");
   });
 
-  it("refuses an apps: scope that names no app", () => {
-    for (const scope of ["apps:", "apps:github", "apps:Acme.github", "apps:acme github"]) {
+  it("refuses a plugins: scope that names no plug-in", () => {
+    for (const scope of ["plugins:", "plugins:github", "plugins:Acme.github", "plugins:acme github"]) {
       const problems = asking([scope]);
       expect(problems.length, scope).toBeGreaterThan(0);
       expect(problems[0].where, scope).toBe("/service/scopes/0");
@@ -875,7 +875,7 @@ describe("terms the contract does not declare", () => {
       features: ["endpoints"],
       endpoints: [
         {
-          id: "app.acme.tracker.read",
+          id: "plugin.acme.tracker.read",
           direction: "read",
           returns: [{ key: "n", type: "int" }],
           visibility: "member",
@@ -906,7 +906,7 @@ describe("terms the contract does not declare", () => {
           features: ["endpoints", "widgets"],
           endpoints: [
             {
-              id: "app.acme.tracker.read",
+              id: "plugin.acme.tracker.read",
               direction: "read",
               label: { en: "Read", "fr-CA": "Lire" },
               returns: [{ key: "n", type: "int" }],
@@ -917,8 +917,8 @@ describe("terms the contract does not declare", () => {
               id: "tile",
               meta: { name: { en: "Tile" }, anything: 1 },
               module_source: "x",
-              endpoints: ["app.acme.tracker.read"],
-              sample_data: { "app.acme.tracker.read": { n: 1 } },
+              endpoints: ["plugin.acme.tracker.read"],
+              sample_data: { "plugin.acme.tracker.read": { n: 1 } },
             },
           ],
         } as never)
@@ -936,7 +936,7 @@ describe("connections Initiative runs", () => {
         { key: "client_id", type: "string", required: true, label: { en: "Client id" } },
         { key: "client_secret", type: "secret", required: true, label: { en: "Secret" } },
         { key: "app_slug", type: "string", required: true, label: { en: "Slug" } },
-        { key: "plugin_id", type: "string", required: true, label: { en: "App id" } },
+        { key: "app_id", type: "string", required: true, label: { en: "App id" } },
         { key: "private_key", type: "secret", required: true, label: { en: "Key" } },
         { key: "webhook_secret", type: "secret", required: true, label: { en: "Hook" } },
       ],
@@ -949,7 +949,7 @@ describe("connections Initiative runs", () => {
           default_events: ["issues", "installation_target"],
         },
         values: {
-          plugin_id: "id",
+          app_id: "id",
           app_slug: "slug",
           client_id: "client_id",
           client_secret: "client_secret",
@@ -991,7 +991,7 @@ describe("connections Initiative runs", () => {
           type: "jwt_bearer",
           exchange_url:
             "https://api.github.com/app/installations/{installation_id}/access_tokens",
-          iss: "{vendor.plugin_id}",
+          iss: "{vendor.app_id}",
           key: "{vendor.private_key}",
           alg: "RS256",
           lifetime: 540,
@@ -1112,13 +1112,13 @@ describe("connections Initiative runs", () => {
   it("holds a vendor setup to the vendor block: declared, kept secret, written once", () => {
     const manifest = github();
     manifest.vendor!.setup!.values = {
-      plugin_ids: "id",
+      app_ids: "id",
       app_slug: "client_secret",
       client_id: "client_id",
       client_secret: "client_secret",
     };
     const text = messages(validateManifest(manifest));
-    expect(text).toContain("/vendor/setup/values/plugin_ids: 'plugin_ids' is not a field of the vendor block");
+    expect(text).toContain("/vendor/setup/values/app_ids: 'app_ids' is not a field of the vendor block");
     expect(text).toContain(
       "/vendor/setup/values/app_slug: 'client_secret' is a secret, and 'app_slug' is not a secret field"
     );
@@ -1129,11 +1129,11 @@ describe("connections Initiative runs", () => {
 
   it("refuses a vendor setup outside the contract", () => {
     const changes: Array<(setup: Record<string, any>) => void> = [
-      (setup) => (setup.kind = "gitlab_plugin"),
+      (setup) => (setup.kind = "gitlab_app"),
       (setup) => (setup.app.url = "http://initiative.example"),
       (setup) => (setup.app.default_permissions.issues = "admin"),
       (setup) => setup.app.default_events.push("issues"),
-      (setup) => (setup.values.plugin_id = "node_id"),
+      (setup) => (setup.values.app_id = "node_id"),
       (setup) => (setup.values = {}),
       (setup) => delete setup.app,
     ];
@@ -1186,7 +1186,7 @@ describe("schedules", () => {
   });
 });
 
-describe("declarative apps", () => {
+describe("declarative plug-ins", () => {
   const declarative = (): Manifest => structuredClone(manifestOf(issuesPlugin()));
   const problems = (manifest: Manifest) => messages(validateManifest(manifest, { publicId: "acme.issues" }));
 
@@ -1206,14 +1206,14 @@ describe("declarative apps", () => {
   it("refuses one that is also a container", () => {
     const manifest: Manifest = { ...declarative(), service: { public_id: "acme.issues" } };
     const text = problems(manifest);
-    expect(text).toContain("/hosts: 'hosts' is a declarative app's term");
-    expect(text).toContain("/endpoints/0/request: a container app's endpoint is answered by its handler");
-    expect(text).toContain("/connections/0/flow/after_connect: a container app sets after_connect true");
-    expect(text).toContain("/connections/0/health: health is a declarative app's");
-    expect(text).toContain("/webhooks/events: a container app's webhook hook receives each delivery");
+    expect(text).toContain("/hosts: 'hosts' is a declarative plug-in's term");
+    expect(text).toContain("/endpoints/0/request: a container plug-in's endpoint is answered by its handler");
+    expect(text).toContain("/connections/0/flow/after_connect: a container plug-in sets after_connect true");
+    expect(text).toContain("/connections/0/health: health is a declarative plug-in's");
+    expect(text).toContain("/webhooks/events: a container plug-in's webhook hook receives each delivery");
   });
 
-  it("refuses a container's parts in a declarative app", () => {
+  it("refuses a container's parts in a declarative plug-in", () => {
     const manifest = declarative();
     delete manifest.hosts;
     delete manifest.endpoints![0].request;
@@ -1221,11 +1221,11 @@ describe("declarative apps", () => {
     manifest.connections![1].flow!.revoke = "hook";
     manifest.schedules = [{ id: "sweep", every: "15m" }];
     const text = problems(manifest);
-    expect(text).toContain("/hosts: a declarative app (one with no service block) names the hosts it calls");
+    expect(text).toContain("/hosts: a declarative plug-in (one with no service block) names the hosts it calls");
     expect(text).toContain("/endpoints/0: a declarative endpoint gives exactly one of 'request' and 'steps'");
-    expect(text).toContain("/connections/0/flow/after_connect: a declarative app gives after_connect's request and map");
-    expect(text).toContain("/connections/1/flow/revoke: a declarative app has no revoke hook");
-    expect(text).toContain("/schedules: a declarative app has no schedules");
+    expect(text).toContain("/connections/0/flow/after_connect: a declarative plug-in gives after_connect's request and map");
+    expect(text).toContain("/connections/1/flow/revoke: a declarative plug-in has no revoke hook");
+    expect(text).toContain("/schedules: a declarative plug-in has no schedules");
   });
 
   it("checks what requests and steps name", () => {
@@ -1239,7 +1239,7 @@ describe("declarative apps", () => {
     manifest.connections![0].health!.request.connection = "workspace";
     const text = problems(manifest);
     expect(text).toContain("/endpoints/1/steps/0/request/url: reads steps.set, which is not a step before it");
-    expect(text).toContain("/endpoints/1/steps/1/request/connection: 'nobody' is not a connection this app declares");
+    expect(text).toContain("/endpoints/1/steps/1/request/connection: 'nobody' is not a connection this plug-in declares");
     expect(text).toContain("/endpoints/0/request/headers/authorization: the credential's header is Initiative's to set");
     expect(text).toContain("/endpoints/2/request/method: a GraphQL request is sent by POST");
     expect(text).toContain("/endpoints/1/errors/0/code: 'jammed' is not one of this endpoint's unavailable codes");
@@ -1267,13 +1267,13 @@ describe("declarative apps", () => {
     if (paging.kind === "cursor") paging.param = "after";
     const after = manifest.connections![0].flow!.after_connect;
     if (typeof after === "object") delete after.code;
-    manifest.webhooks!.events![0].emit = "app.acme.issues.label";
+    manifest.webhooks!.events![0].emit = "plugin.acme.issues.label";
     manifest.webhooks!.status![0].state = "unavailable";
     manifest.webhooks!.route.header = "X-Account";
     const text = problems(manifest);
     expect(text).toContain("/endpoints/2/request/paging: a cursor is sent in exactly one of 'param' and 'variable'");
     expect(text).toContain("/connections/0/flow/after_connect: a refusal gives both 'refuse_when' and the 'code'");
-    expect(text).toContain("/webhooks/events/0/emit: 'app.acme.issues.label' is not an emit endpoint");
+    expect(text).toContain("/webhooks/events/0/emit: 'plugin.acme.issues.label' is not an emit endpoint");
     expect(text).toContain("/webhooks/status/0/state: a delivery says a connection is ok, suspended or removed");
     expect(text).toContain("/webhooks/route: a delivery is routed by exactly one of 'path' and 'header'");
   });
@@ -1281,7 +1281,7 @@ describe("declarative apps", () => {
   it("checks after_connect's steps as an endpoint's", () => {
     const manifest = declarative();
     const after = manifest.connections![0].flow!.after_connect;
-    if (typeof after !== "object") throw new Error("the issues app's after_connect is declarative");
+    if (typeof after !== "object") throw new Error("the issues plug-in's after_connect is declarative");
     const request = after.request!;
     delete after.request;
     after.steps = [

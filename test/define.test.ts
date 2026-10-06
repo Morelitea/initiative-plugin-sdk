@@ -8,10 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import { manifestOf } from "../src/define.js";
 import { definePlugin, defineEndpoint, validateManifest } from "../src/manifest.js";
-import { issuesPlugin, trackerPlugin } from "./support/app.js";
+import { issuesPlugin, trackerPlugin } from "./support/plugin.js";
 
-const { app } = trackerPlugin();
-const manifest = manifestOf(app, { "open-count": "globalThis.render = function () {};" });
+const { plugin } = trackerPlugin();
+const manifest = manifestOf(plugin, { "open-count": "globalThis.render = function () {};" });
 
 describe("manifestOf", () => {
   it("writes the contract's manifest, in its order, with every key made an id", () => {
@@ -19,7 +19,7 @@ describe("manifestOf", () => {
       JSON.stringify(
         {
           plugin_kind: "service",
-          service: { public_id: "acme.tracker", protocol: 1, scopes: ["projects:read", "apps:acme.github"] },
+          service: { public_id: "acme.tracker", protocol: 1, scopes: ["projects:read", "plugins:acme.github"] },
           features: ["dashboards", "embeds", "endpoints", "widgets"],
           default_name: "Tracker",
           vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
@@ -42,13 +42,13 @@ describe("manifestOf", () => {
           schedules: [{ id: "sweep", every: "15m" }],
           endpoints: [
             {
-              id: "app.acme.tracker.projects",
+              id: "plugin.acme.tracker.projects",
               direction: "read",
               label: { en: "Projects" },
               returns: [{ key: "ids", type: "string", list: true }],
             },
             {
-              id: "app.acme.tracker.open-tickets",
+              id: "plugin.acme.tracker.open-tickets",
               direction: "read",
               label: { en: "Open tickets" },
               public: true,
@@ -59,7 +59,7 @@ describe("manifestOf", () => {
                   key: "project",
                   type: "string",
                   label: { en: "Project" },
-                  options_from: { endpoint: "app.acme.tracker.projects", key: "ids" },
+                  options_from: { endpoint: "plugin.acme.tracker.projects", key: "ids" },
                 },
                 { key: "labels", type: "string", label: { en: "Labels" }, list: true },
               ],
@@ -69,7 +69,7 @@ describe("manifestOf", () => {
               ],
             },
             {
-              id: "app.acme.tracker.close-ticket",
+              id: "plugin.acme.tracker.close-ticket",
               direction: "write",
               label: { en: "Close a ticket" },
               public: true,
@@ -77,7 +77,7 @@ describe("manifestOf", () => {
               returns: [{ key: "closed", type: "bool" }],
             },
             {
-              id: "app.acme.tracker.ticket-opened",
+              id: "plugin.acme.tracker.ticket-opened",
               direction: "emit",
               label: { en: "A ticket was opened" },
               returns: [
@@ -87,14 +87,14 @@ describe("manifestOf", () => {
               identity: { kind: "ticket", key: ["number"] },
             },
           ],
-          community_summary: "app.acme.tracker.projects",
+          community_summary: "plugin.acme.tracker.projects",
           widgets: [
             {
               id: "open-count",
               meta: { name: { en: "Open tickets" } },
-              endpoints: ["app.acme.tracker.open-tickets"],
+              endpoints: ["plugin.acme.tracker.open-tickets"],
               module_source: "globalThis.render = function () {};",
-              sample_data: { "app.acme.tracker.open-tickets": { total: 3 } },
+              sample_data: { "plugin.acme.tracker.open-tickets": { total: 3 } },
             },
           ],
           embeds: [{ id: "board", path: "/board", name: { en: "Board" }, scopes: ["initiative"] }],
@@ -106,7 +106,7 @@ describe("manifestOf", () => {
               widgets: [
                 {
                   type: "open-count",
-                  binding: { endpoint_id: "app.acme.tracker.open-tickets", params: { project: "p1" } },
+                  binding: { endpoint_id: "plugin.acme.tracker.open-tickets", params: { project: "p1" } },
                 },
               ],
             },
@@ -140,8 +140,8 @@ describe("a declarative definition", () => {
     expect(declarative).not.toHaveProperty("service");
     expect(Object.keys(declarative).slice(0, 5)).toEqual(["plugin_kind", "features", "default_name", "hosts", "vendor"]);
     expect(declarative.hosts).toEqual(["api.tracker.example", "*.tracker.example"]);
-    expect(declarative.webhooks?.events?.[0].emit).toBe("app.acme.issues.issue-opened");
-    expect(declarative.endpoints?.[1]).toMatchObject({ id: "app.acme.issues.label", steps: [{ name: "current" }, { name: "set" }] });
+    expect(declarative.webhooks?.events?.[0].emit).toBe("plugin.acme.issues.issue-opened");
+    expect(declarative.endpoints?.[1]).toMatchObject({ id: "plugin.acme.issues.label", steps: [{ name: "current" }, { name: "set" }] });
   });
 
   it("is a manifest the SDK's own validation passes", () => {
