@@ -1,0 +1,84 @@
+name: Promote
+
+# scripts/promote.sh behind a button: Actions → Promote → Run workflow. It
+# bumps the version, stamps the changelog if the repository keeps one, and
+# opens the release pull request release/vX.Y.Z → main; merging that pull
+# request publishes the version (publish.yml). It runs as the release app, so
+# the pull request it opens gets its CI, as one a person opened would; a pull
+# request opened with the workflow's own token starts no workflows. Only a
+# code owner may start it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: The release to cut
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry-run:
+        description: Show what would happen, and change nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: promote.sh --${{ inputs.kind }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Only a code owner
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+        run: |
+          case "${ACTOR,,}" in
+            jordandrako|leejmorel) echo "Started by $ACTOR" ;;
+            *) echo "::error::$ACTOR is not a code owner."; exit 1 ;;
+          esac
+
+      - name: Get the release app's token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Push the release branch and open its pull request. The branch is
+          # cut from main, so it carries no workflow change to need more.
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Commit as the release app
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id=$(gh api "users/${SLUG}[bot]" --jq .id)
+          git config --global user.name "${SLUG}[bot]"
+          git config --global user.email "${id}+${SLUG}[bot]@users.noreply.github.com"
+
+      - name: Run promote.sh
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          KIND: ${{ inputs.kind }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          args=("--$KIND")
+          if [[ "$DRY_RUN" == true ]]; then args+=(--dry-run); fi
+          scripts/promote.sh "${args[@]}"
