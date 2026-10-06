@@ -196,6 +196,29 @@ any path under the surface's as `Authorization: Bearer …`: the SDK verifies it
 handler `viewer`, `admin`, `initiative` and a `client` acting as the
 installation, narrowed to that initiative.
 
+### Where a community stands
+
+`communitySummary` names a read whose returns say what a community has used and
+is allowed. A deployment may draw them on the community's settings page, each
+under its own `label`. A return with `of` is counted against another, so the two
+are drawn as one measure:
+
+```ts
+returns: {
+  runs_used: { type: "int", label: { en: "Runs this month" }, of: "allowance" },
+  allowance: { type: "int", label: { en: "Monthly allowance" } }, // null: no ceiling
+  pack_credits: { type: "int", label: { en: "Credits left" } },
+  resets_on: { type: "datetime", label: { en: "Resets" } },
+},
+```
+
+### Minimum age
+
+`minimumAge` says how old somebody must be to use the plug-in, by ISO 3166-1
+alpha-2 country, with `default` for every country not listed:
+`{ default: 16, US: 13 }`. It is a declaration; whether a deployment enforces
+it is the deployment's decision.
+
 ## 2. Widgets
 
 A widget is a module exporting `render`, typed from the endpoint it draws:

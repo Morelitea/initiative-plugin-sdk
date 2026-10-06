@@ -18,7 +18,7 @@ import {
   type Manifest,
 } from "../src/manifest.js";
 import { pluginDocument } from "../src/validate.js";
-import { SCOPES } from "../src/contract.js";
+import { CAPS, SCOPES } from "../src/contract.js";
 import { manifestOf } from "../src/define.js";
 import { issuesPlugin } from "./support/plugin.js";
 
@@ -783,6 +783,80 @@ describe("community_summary", () => {
     // Most plug-ins have no standing with a community to report, and saying nothing is
     // the ordinary case rather than an omission.
     expect(validateManifest(base())).toEqual([]);
+  });
+});
+
+describe("a return counted against another", () => {
+  const measured = (returns: Endpoint["returns"]): Manifest => ({
+    ...base(),
+    features: ["endpoints"],
+    endpoints: [{ id: "plugin.acme.tracker.standing", direction: "read", returns } as Endpoint],
+  });
+
+  it("accepts a figure counted against its ceiling", () => {
+    expect(
+      validateManifest(
+        measured([
+          { key: "used", type: "int", of: "allowed" },
+          { key: "allowed", type: "int" },
+          { key: "resets_on", type: "datetime" },
+        ])
+      )
+    ).toEqual([]);
+  });
+
+  it("refuses a ceiling the endpoint does not return", () => {
+    const problems = validateManifest(measured([{ key: "used", type: "int", of: "allowed" }]));
+    expect(messages(problems)).toContain("'allowed' is not a return of this endpoint");
+  });
+
+  it("refuses a figure counted against itself", () => {
+    const problems = validateManifest(measured([{ key: "used", type: "int", of: "used" }]));
+    expect(messages(problems)).toContain("counted against itself");
+  });
+
+  it("refuses a half that is not one whole number", () => {
+    // A list has no single figure and a date has no proportion, so neither
+    // can be drawn as how much of something is used.
+    const listed = validateManifest(
+      measured([
+        { key: "used", type: "int", of: "allowed", list: true },
+        { key: "allowed", type: "int" },
+      ])
+    );
+    expect(messages(listed)).toContain("'used' is not a single 'int'");
+    const dated = validateManifest(
+      measured([
+        { key: "used", type: "int", of: "allowed" },
+        { key: "allowed", type: "datetime" },
+      ])
+    );
+    expect(messages(dated)).toContain("'allowed' is not a single 'int'");
+  });
+});
+
+describe("minimum_age", () => {
+  const aged = (minimum_age: unknown): Manifest => ({ ...base(), minimum_age } as Manifest);
+
+  it("accepts an age by country, with a default for the rest", () => {
+    expect(validateManifest(aged({ default: 16, US: 13, GB: 13, FR: 15 }))).toEqual([]);
+  });
+
+  it("refuses a region that is not a country code or 'default'", () => {
+    // GDPR is not one age, so a regime is not a region.
+    expect(validateManifest(aged({ gdpr: 16 }))).not.toEqual([]);
+    expect(validateManifest(aged({ us: 13 }))).not.toEqual([]);
+    expect(validateManifest(aged({ USA: 13 }))).not.toEqual([]);
+  });
+
+  it("refuses an age outside the bounds", () => {
+    expect(validateManifest(aged({ default: 12 }))).not.toEqual([]);
+    expect(validateManifest(aged({ default: CAPS.minimumAgeYears + 1 }))).not.toEqual([]);
+    expect(validateManifest(aged({ default: 16.5 }))).not.toEqual([]);
+  });
+
+  it("refuses an empty map, which says nothing", () => {
+    expect(validateManifest(aged({}))).not.toEqual([]);
   });
 });
 

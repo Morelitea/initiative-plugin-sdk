@@ -133,6 +133,22 @@ describe("manifestOf", () => {
   });
 });
 
+describe("a minimum age", () => {
+  it("is written beside the name, by country", () => {
+    const aged = manifestOf(
+      { ...plugin, minimumAge: { default: 16, US: 13 } },
+      { "open-count": "globalThis.render = function () {};" }
+    );
+    expect(aged.minimum_age).toEqual({ default: 16, US: 13 });
+    expect(Object.keys(aged).indexOf("minimum_age")).toBe(Object.keys(aged).indexOf("default_name") + 1);
+    expect(validateManifest(aged)).toEqual([]);
+  });
+
+  it("is left out when the definition says nothing", () => {
+    expect("minimum_age" in manifest).toBe(false);
+  });
+});
+
 describe("a declarative definition", () => {
   const declarative = manifestOf(issuesPlugin());
 

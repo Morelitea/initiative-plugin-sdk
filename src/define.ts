@@ -339,6 +339,8 @@ export interface PluginDefinition<E, W> {
   /** The catalog id: 14 characters of Crockford base32, minted once (`initiative-plugin uid`). */
   uid: string;
   name: string;
+  /** How old somebody must be to use it, by ISO 3166-1 alpha-2 country, with `default` for the rest: `{ default: 16, US: 13 }`. */
+  minimumAge?: Record<string, number>;
   scopes?: Array<Scope | PluginScope>;
   /** A declarative plug-in's hosts: every host its requests may reach. Naming them makes the plug-in declarative. */
   hosts?: string[];
@@ -421,6 +423,7 @@ export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = 
       : { service: { public_id: plugin.publicId, protocol: 1, ...(plugin.scopes ? { scopes: [...plugin.scopes] } : {}) } }),
     features: FEATURES.filter((feature) => present[feature] !== undefined),
     default_name: plugin.name,
+    ...(plugin.minimumAge ? { minimum_age: { ...plugin.minimumAge } } : {}),
     ...(plugin.hosts ? { hosts: [...plugin.hosts] } : {}),
     ...(plugin.auth ? { auth: plugin.auth } : {}),
     ...present,
