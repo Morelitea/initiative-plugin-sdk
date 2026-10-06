@@ -4,8 +4,8 @@
  * manifest checks.
  *
  *   initiative-plugin init [dir] [--example minimal]
- *   initiative-plugin build [--plugin <file>] [--registry <dir>] [--check]
- *   initiative-plugin pack [--plugin <file>] [--out <file>]
+ *   initiative-plugin build [--plugin <file> | --manifest <file>] [--registry <dir>] [--check]
+ *   initiative-plugin pack [--plugin <file> | --manifest <file>] [--out <file>]
  *   initiative-plugin dev --initiative <url> [--api-key <key>] [--plugin <file>]
  *   initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]
  *   initiative-plugin validate <file.json>   a manifest, or a served manifest document
@@ -14,7 +14,8 @@
  *
  * `build` reads the plug-in's definition (default `src/plugin.ts`) and writes
  * `manifest.json`, and with `--registry` the plug-in's registry source; see
- * `build.ts`. `pack` writes the plug-in's listing file, which a self-hosted
+ * `build.ts`; `--manifest` names a plug-in built outside TypeScript in place of
+ * its definition. `pack` writes the plug-in's listing file, which a self-hosted
  * deployment publishes as its own plug-in (`pack.ts`), and `dev` uploads it to one
  * and again on each change (`dev.ts`); its key may be given as
  * `INITIATIVE_API_KEY` instead. `init` copies an example (`init.ts`).
@@ -37,8 +38,8 @@ function usage(): never {
     [
       "usage:",
       "  initiative-plugin init [dir] [--example minimal]",
-      "  initiative-plugin build [--plugin <file>] [--registry <dir>] [--check]",
-      "  initiative-plugin pack [--plugin <file>] [--out <file>]",
+      "  initiative-plugin build [--plugin <file> | --manifest <file>] [--registry <dir>] [--check]",
+      "  initiative-plugin pack [--plugin <file> | --manifest <file>] [--out <file>]",
       "  initiative-plugin dev --initiative <url> [--api-key <key>] [--plugin <file>]",
       "  initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]",
       "  initiative-plugin validate <file.json>",
@@ -126,17 +127,18 @@ async function main(argv: string[]): Promise<number> {
       return init({ dir, example: options.example ?? "minimal" });
     }
     case "build": {
-      const options = flags(rest, ["plugin", "registry"], ["check"]);
+      const options = flags(rest, ["plugin", "manifest", "registry"], ["check"]);
       return build({
         root: process.cwd(),
         plugin: typeof options.plugin === "string" ? options.plugin : "src/plugin.ts",
+        ...(typeof options.manifest === "string" ? { manifest: options.manifest } : {}),
         ...(typeof options.registry === "string" ? { registry: options.registry } : {}),
         check: options.check === true,
       });
     }
     case "pack": {
-      const options = flags(rest, ["plugin", "out"]) as Record<string, string>;
-      return pack({ root: process.cwd(), plugin: options.plugin ?? "src/plugin.ts", out: options.out });
+      const options = flags(rest, ["plugin", "manifest", "out"]) as Record<string, string>;
+      return pack({ root: process.cwd(), plugin: options.plugin ?? "src/plugin.ts", manifest: options.manifest, out: options.out });
     }
     case "dev": {
       const options = flags(rest, ["initiative", "api-key", "plugin"]) as Record<string, string>;

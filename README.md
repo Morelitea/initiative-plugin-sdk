@@ -436,6 +436,16 @@ while `listing.version` is the package's own version: between releases the
 package runs ahead of its listing, and a new version is listed at its release,
 with its image's digest. The registry's CI checks and signs what is merged.
 
+A plug-in written in another language builds its manifest itself and hands the
+SDK a JSON file in place of `src/plugin.ts`: its `publicId`, `uid` and `name`,
+its `manifest`, and its `listing` as declared above. The manifest is checked as
+a definition's is, and the listing states the version it lists:
+
+```sh
+npx initiative-plugin build --manifest plugin.json --registry ../registry/sources
+npx initiative-plugin pack --manifest plugin.json
+```
+
 A self-hosted deployment can also publish a plug-in that is in no registry, from
 its listing file: see [A private plug-in](#a-private-plug-in).
 

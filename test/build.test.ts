@@ -260,6 +260,68 @@ describe("a declarative plug-in", () => {
 const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 const picture = `/api/v1/marketplace/media/${digest(avatar)}`;
 
+describe("a plug-in built outside TypeScript", () => {
+  /** The definition's manifest, as a plug-in written in another language writes it with its listing. */
+  async function built(listing: Record<string, unknown> = {}) {
+    expect(await run()).toBe(0);
+    const written = manifest();
+    rmSync(join(root, "manifest.json"));
+    rmSync(join(root, "package.json"));
+    write({
+      "plugin.json": JSON.stringify({
+        publicId: "acme.tracker",
+        uid: "K7M2QX8N4TVB9C",
+        name: "Tracker",
+        manifest: written,
+        listing: {
+          publisher: "acme",
+          summary: "Tickets.",
+          avatar: "assets/avatar.png",
+          version: "2.0.0",
+          image: `ghcr.io/acme/tracker@sha256:${"b".repeat(64)}`,
+          referenceSectors: ["billing"],
+          ...listing,
+        },
+      }),
+    });
+    return written;
+  }
+
+  it("writes its registry source from its manifest and the version its listing states", async () => {
+    const written = await built();
+    expect(await build({ root, plugin: "src/plugin.ts", manifest: "plugin.json", registry: "registry", check: false })).toBe(0);
+    const source = join(root, "registry", "acme", "K7M2QX8N4TVB9C");
+    const listing = JSON.parse(readFileSync(join(source, "listing.json"), "utf-8"));
+    expect(listing.versions).toEqual([{ version: "2.0.0", definition: "2.0.0/manifest.json" }]);
+    expect(listing.registration).toEqual({
+      kind: "container",
+      image: `ghcr.io/acme/tracker@sha256:${"b".repeat(64)}`,
+      scope_ceiling: [],
+      reference_sectors: ["billing"],
+    });
+    expect(JSON.parse(readFileSync(join(source, "2.0.0", "manifest.json"), "utf-8"))).toEqual(written);
+    expect(existsSync(join(root, "manifest.json"))).toBe(false);
+  });
+
+  it("packs its listing file", async () => {
+    const written = await built();
+    expect(await pack({ root, plugin: "src/plugin.ts", manifest: "plugin.json", out: "tracker.json" })).toBe(0);
+    const listing = JSON.parse(readFileSync(join(root, "tracker.json"), "utf-8"));
+    expect(listing.definition).toEqual(written);
+    expect(listing.version).toBe("2.0.0");
+  });
+
+  it("is checked as a definition's manifest is", async () => {
+    await built({ image: undefined });
+    expect(await build({ root, plugin: "src/plugin.ts", manifest: "plugin.json", registry: "registry", check: false })).toBe(1);
+    expect(errors.join("")).toContain("listing: a container plug-in names its image");
+    write({ "plugin.json": JSON.stringify({ publicId: "acme.tracker" }) });
+    expect(await build({ root, plugin: "src/plugin.ts", manifest: "plugin.json", check: false })).toBe(1);
+    expect(errors.join("")).toContain("a built plug-in names its uid, name, manifest");
+    expect(existsSync(join(root, "registry"))).toBe(false);
+  });
+});
+
 describe("pack", () => {
   it("writes the listing file a deployment publishes, its picture named by its digest", async () => {
     write({ "src/plugin.ts": declarative('{"total": response.body.count}') });
