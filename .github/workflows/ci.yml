@@ -14,12 +14,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # Without lifecycle scripts: npm ci would run prepare, which regenerates
+      # the very files check:generated compares, so the check could never fail.
+      - run: npm ci --ignore-scripts
       # The contract is the source; the schema and the types are its output. A
       # contract edited without regenerating fails here rather than shipping a
       # package whose types and schema disagree.
       - run: npm run check:generated
+      # What --ignore-scripts skipped: the dependencies' install scripts, then
+      # the package's own prepare (generate, a no-op once checked, and build).
+      - run: npm rebuild
+      - run: npm run prepare
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:command
-      - run: npm run build

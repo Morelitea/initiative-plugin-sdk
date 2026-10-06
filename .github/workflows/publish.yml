@@ -110,12 +110,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # Without lifecycle scripts, so prepare cannot regenerate what
+      # check:generated compares; then what they would have done, in order.
+      - run: npm ci --ignore-scripts
       - run: npm run check:generated
+      - run: npm rebuild
+      - run: npm run prepare
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:command
-      - run: npm run build
 
   github-release:
     name: Tag and GitHub Release
