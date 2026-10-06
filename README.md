@@ -360,12 +360,12 @@ for (const { installation, active } of await initiative.installations()) {
 
   ```ts
   const task = await client.api.updateTask({ path: { task_id: 7 }, body: { title: "Ship it" } });
-  await client.api.archiveEntity({ path: { entity_type: "document", entity_id: 3 } });
+  await client.api.archiveEntity({ path: { entity_type: "file", entity_id: 3 } });
   ```
 
   No call is sent unless the token holds the scope it needs: the route's own,
-  the one its argument picks (`archiveEntity` on a `document` needs
-  `documents:write`), or, where Initiative checks each item, at least one of
+  the one its argument picks (`archiveEntity` on a `file` needs
+  `files:write`), or, where Initiative checks each item, at least one of
   them. `MissingScopeError` names the scope instead. Writing implies reading.
 
   `client.api` follows Initiative's plug-in API: when Initiative renames or moves a

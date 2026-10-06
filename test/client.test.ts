@@ -25,7 +25,9 @@ interface Sent {
   url: string;
   method: string;
   authorization: string | null;
+  contentType: string | null;
   body: string;
+  form: boolean;
 }
 
 let sent: Sent[];
@@ -50,7 +52,9 @@ const fetchImpl = (async (input: string | URL | Request, init: RequestInit = {})
     url: String(input),
     method: init.method ?? "GET",
     authorization: new Headers(init.headers).get("authorization"),
+    contentType: new Headers(init.headers).get("content-type"),
     body: String(init.body ?? ""),
+    form: init.body instanceof FormData,
   };
   sent.push(request);
   if (request.url === TOKEN_URL) {
@@ -232,8 +236,17 @@ describe("the plug-in API", () => {
     expect(picture.type).toBe("image/png");
   });
 
+  it("sends a form as it is, for fetch to write its boundary", async () => {
+    scope = "galleries:write";
+    answers.set("POST /api/v1/c/0/galleries/4/images", () => json(201, { id: 1 }));
+    const body = new FormData();
+    body.append("file", new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }), "map.png");
+    await initiative().asInstallation("gapp_1").api.uploadGalleryImage({ path: { gallery_id: 4 }, body });
+    expect(sent.at(-1)).toMatchObject({ form: true, contentType: null });
+  });
+
   it("checks the scope an operation names, before sending", async () => {
-    const error = await initiative().asInstallation("gapp_1").api.listDocuments().catch((caught) => caught);
+    const error = await initiative().asInstallation("gapp_1").api.listFiles().catch((caught) => caught);
     expect(error).toBeInstanceOf(MissingScopeError);
     expect(error.scope).toBe("files:read");
     expect(routes()).toEqual([]);
@@ -243,7 +256,7 @@ describe("the plug-in API", () => {
     answers.set("POST /api/v1/c/0/archive/task/3", () => json(200, {}));
     const api = initiative().asInstallation("gapp_1").api;
     await api.archiveEntity({ path: { entity_type: "task", entity_id: 3 } });
-    const error = await api.archiveEntity({ path: { entity_type: "document", entity_id: 3 } }).catch((caught) => caught);
+    const error = await api.archiveEntity({ path: { entity_type: "file", entity_id: 3 } }).catch((caught) => caught);
     expect(error).toBeInstanceOf(MissingScopeError);
     expect(error.scope).toBe("files:write");
     await expect(api.archiveEntity({ path: { entity_type: "widget" as never, entity_id: 3 } })).rejects.toThrow(

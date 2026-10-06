@@ -661,11 +661,13 @@ export class Client {
 
   private async send(grant: Grant, method: string, path: string, payload?: unknown): Promise<unknown> {
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (payload !== undefined) headers["Content-Type"] = "application/json";
+    // A form goes as it is, so fetch writes its multipart boundary.
+    const form = payload instanceof FormData;
+    if (payload !== undefined && !form) headers["Content-Type"] = "application/json";
     const response = await this.tokens.send(grant, path, {
       method,
       headers,
-      ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
+      ...(payload !== undefined ? { body: form ? payload : JSON.stringify(payload) } : {}),
     });
     const type = response.headers.get("content-type");
     if (response.ok && type && !/json/i.test(type)) return response.blob();
