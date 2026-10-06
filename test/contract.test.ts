@@ -154,19 +154,19 @@ describe("the schema draws its vocabulary from the contract", () => {
   it("an app's requested scopes are unique", () => {
     expect(schema.properties.service.properties.scopes.uniqueItems).toBe(true);
     expect(schema.properties.service.properties.scopes.maxItems).toBe(
-      SCOPES.length + CAPS.appScopes
+      SCOPES.length + CAPS.pluginScopes
     );
   });
 
   it("the apps: family is a pattern beside the enum, over the public-id characters", () => {
-    const pattern = new RegExp(schema.$defs.appScope.pattern);
+    const pattern = new RegExp(schema.$defs.pluginScope.pattern);
     expect(pattern.test("apps:acme.github")).toBe(true);
     expect(pattern.test("apps:acme")).toBe(false);
     expect(pattern.test("apps:Acme.github")).toBe(false);
     expect(pattern.test("app:acme.github")).toBe(false);
     expect(pattern.test("xapps:acme.github")).toBe(false);
     expect(schema.properties.service.properties.scopes.items.anyOf[1]).toEqual({
-      $ref: "#/$defs/appScope",
+      $ref: "#/$defs/pluginScope",
     });
   });
 

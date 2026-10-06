@@ -2,7 +2,7 @@
  * Initiative, as an app reaches it.
  *
  * An app authenticates with its own key (`private_key_jwt`, RFC 7523) at
- * `POST {baseUrl}/app-platform/oauth/token` and acts with one of two tokens:
+ * `POST {baseUrl}/plugin-platform/oauth/token` and acts with one of two tokens:
  *
  * - an **installation token** (`client_credentials` + `installation`), acting as
  *   the community that installed the app, with the scopes it granted;
@@ -26,28 +26,28 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  AppApi,
-  appApiOperations,
-  type AppApiArgs,
-  type AppApiOperation,
-  type AppApiOperationId,
-} from "./app-api.generated.js";
-import type { ActorKind, AppScope, Scope } from "./contract.js";
+  PluginApi,
+  pluginApiOperations,
+  type PluginApiArgs,
+  type PluginApiOperation,
+  type PluginApiOperationId,
+} from "./plugin-api.generated.js";
+import type { ActorKind, PluginScope, Scope } from "./contract.js";
 import type { Actor } from "./define.js";
-import { signJwt, type AppSigningKey } from "./keys.js";
+import { signJwt, type PluginSigningKey } from "./keys.js";
 
 export {
-  generateAppKeys,
+  generatePluginKeys,
   jwkThumbprint,
   loadPrivateKey,
   publicJwks,
-  type AppKeyAlgorithm,
-  type AppSigningKey,
-  type GeneratedAppKeys,
+  type PluginKeyAlgorithm,
+  type PluginSigningKey,
+  type GeneratedPluginKeys,
   type Jwks,
   type PublicJwk,
 } from "./keys.js";
-export type { AppApi, AppApiSchemas } from "./app-api.generated.js";
+export type { PluginApi, PluginApiSchemas } from "./plugin-api.generated.js";
 
 const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 const JWT_BEARER_GRANT = "urn:ietf:params:oauth:grant-type:jwt-bearer";
@@ -67,7 +67,7 @@ export interface InitiativeOptions {
   /** The app's public id: its OAuth client id. */
   publicId: string;
   /** The app's key, as `loadPrivateKey` gives it. */
-  key: AppSigningKey;
+  key: PluginSigningKey;
   fetch?: typeof fetch;
   /** Milliseconds since the epoch. */
   now?: () => number;
@@ -75,7 +75,7 @@ export interface InitiativeOptions {
 
 /** Narrowing for a token: fewer scopes than were granted, and one initiative. */
 export interface Narrowing {
-  scopes?: ReadonlyArray<Scope | AppScope>;
+  scopes?: ReadonlyArray<Scope | PluginScope>;
   initiative?: number;
 }
 
@@ -269,7 +269,7 @@ class Tokens {
   constructor(private readonly options: InitiativeOptions) {
     if (!options.publicId) throw new TypeError("publicId is the app's public id");
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-    this.endpoint = `${this.baseUrl}/app-platform/oauth/token`;
+    this.endpoint = `${this.baseUrl}/plugin-platform/oauth/token`;
     this.fetch = options.fetch ?? fetch;
     this.now = options.now ?? Date.now;
   }
@@ -392,7 +392,7 @@ export class Initiative {
    */
   async installations(): Promise<Installation[]> {
     const installations: Installation[] = [];
-    let url: string | null = `${this.tokens.baseUrl}/app-platform/installations`;
+    let url: string | null = `${this.tokens.baseUrl}/plugin-platform/installations`;
     while (url !== null) {
       const response: Response = await this.tokens.send(null, url, { headers: { Accept: "application/json" } });
       const body = await readJson(response);
@@ -448,12 +448,12 @@ function grantOf(installation: string, narrowing: Narrowing): Grant {
 /**
  * Initiative, acting as one actor in one installation.
  *
- * Content calls ({@link Client.request}, {@link Client.callApp}) go on the
+ * Content calls ({@link Client.request}, {@link Client.callPlugin}) go on the
  * actor's own token. The installation's own configuration, connections, status
  * and events go on the installation's token, narrowed to the same initiative.
  */
 export class Client {
-  private appApi?: AppApi;
+  private pluginApi?: PluginApi;
 
   constructor(
     private readonly tokens: Tokens,
@@ -466,8 +466,8 @@ export class Client {
    * Each is checked against the token's scopes before it is sent, like
    * {@link Client.request}.
    */
-  get api(): AppApi {
-    return (this.appApi ??= new AppApi((operation, args) => this.operation(operation, args)));
+  get api(): PluginApi {
+    return (this.pluginApi ??= new PluginApi((operation, args) => this.operation(operation, args)));
   }
 
   get installation(): string {
@@ -498,7 +498,7 @@ export class Client {
   async request<T = unknown>(
     method: string,
     path: string,
-    options: { scope: Scope | AppScope; body?: unknown }
+    options: { scope: Scope | PluginScope; body?: unknown }
   ): Promise<T> {
     return (await this.call(method, `${COMMUNITY_PREFIX}${path.startsWith("/") ? path : `/${path}`}`, options)) as T;
   }
@@ -507,8 +507,8 @@ export class Client {
    * Call another app's public endpoint through Initiative, as this actor. Needs
    * `apps:<publicId>`. A write is sent once and never retried by Initiative.
    */
-  async callApp(publicId: string, endpointId: string, params: Record<string, unknown> = {}): Promise<InvokeOutcome> {
-    const path = `/app-platform/apps/${encodeURIComponent(publicId)}/endpoints/${encodeURIComponent(endpointId)}`;
+  async callPlugin(publicId: string, endpointId: string, params: Record<string, unknown> = {}): Promise<InvokeOutcome> {
+    const path = `/plugin-platform/plugins/${encodeURIComponent(publicId)}/endpoints/${encodeURIComponent(endpointId)}`;
     const body = await this.call("POST", path, { scope: `apps:${publicId}`, body: { params } });
     if (!isRecord(body) || !isRecord(body.result)) {
       throw new InitiativeApiError(200, "call: the app answered without a result");
@@ -605,7 +605,7 @@ export class Client {
 
   /** Ask a member to let the app act for them, on Initiative's own consent screen. */
   async requestConsent(request: ConsentRequest): Promise<Record<string, unknown>> {
-    const body = await this.send(this.installationGrant(), "POST", "/app-platform/consent-requests", {
+    const body = await this.send(this.installationGrant(), "POST", "/plugin-platform/consent-requests", {
       member: request.member,
       label: request.label,
       access: request.access,
@@ -616,8 +616,8 @@ export class Client {
   }
 
   /** One operation of the app API, its scope resolved from the operations table. */
-  private async operation(id: AppApiOperationId, args: AppApiArgs = {}): Promise<unknown> {
-    const operation: AppApiOperation = appApiOperations[id];
+  private async operation(id: PluginApiOperationId, args: PluginApiArgs = {}): Promise<unknown> {
+    const operation: PluginApiOperation = pluginApiOperations[id];
     const { method, path, scope } = operation;
     const values = args.path ?? {};
     let needs: Scope;
@@ -650,7 +650,7 @@ export class Client {
   }
 
   private async installationCall(method: string, path: string, payload?: Record<string, unknown>): Promise<unknown> {
-    return (await this.send(this.installationGrant(), method, `/app-platform/installation${path}`, payload)) ?? {};
+    return (await this.send(this.installationGrant(), method, `/plugin-platform/installation${path}`, payload)) ?? {};
   }
 
   private async call(method: string, path: string, options: { scope: string; body?: unknown }): Promise<unknown> {

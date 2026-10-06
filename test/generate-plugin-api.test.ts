@@ -1,5 +1,5 @@
 /**
- * `scripts/generate-app-api.mjs`: what it refuses in an app API document.
+ * `scripts/generate-plugin-api.mjs`: what it refuses in an app API document.
  */
 
 import { execFile } from "node:child_process";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it } from "vitest";
 
-const script = fileURLToPath(new URL("../scripts/generate-app-api.mjs", import.meta.url));
+const script = fileURLToPath(new URL("../scripts/generate-plugin-api.mjs", import.meta.url));
 
 it("fails on a parameter with neither a schema nor JSON content", async () => {
   const document = {
@@ -19,7 +19,7 @@ it("fails on a parameter with neither a schema nor JSON content", async () => {
       "/tasks/": {
         get: {
           operationId: "list_tasks",
-          "x-app-scope": "projects:read",
+          "x-plugin-scope": "projects:read",
           parameters: [{ name: "conditions", in: "query" }],
           responses: { "200": { description: "OK" } },
         },

@@ -1,5 +1,5 @@
 /**
- * `initiative-app-sdk/testing`: a declarative app's requests and mappings,
+ * `initiative-plugin-sdk/testing`: a declarative app's requests and mappings,
  * run against recorded vendor answers, with no server and no network.
  *
  * Each runner renders the requests the way Initiative makes them (method,
@@ -27,7 +27,7 @@
 
 import type { ConnectionState, ErrorRule, StatusMatch, VendorRequest } from "./contract.js";
 import { PLATFORM_CODES } from "./contract.js";
-import type { AnyApp, ReturnSpec } from "./define.js";
+import type { AnyPlugin, ReturnSpec } from "./define.js";
 import { evaluate, ExpressionError } from "./expression.js";
 
 export { evaluate, ExpressionError, parseExpression } from "./expression.js";
@@ -305,7 +305,7 @@ function fits(answer: unknown, returns: Record<string, ReturnSpec> | undefined, 
  * on whose credential, is Initiative's to decide.
  */
 export async function runEndpoint(
-  app: AnyApp,
+  app: AnyPlugin,
   name: string,
   call: Recorded & {
     params?: Record<string, unknown>;
@@ -352,7 +352,7 @@ export async function runEndpoint(
  * the last answer as `response` and, with steps, each one's as `steps.<name>`.
  */
 export async function runAfterConnect(
-  app: AnyApp,
+  app: AnyPlugin,
   connection: string,
   call: Recorded & { params?: Record<string, string> }
 ): Promise<Run<{ values?: Record<string, unknown>; account_label?: string }>> {
@@ -384,7 +384,7 @@ export async function runAfterConnect(
 
 /** A connection's health check: its request made with the connection's non-secret `fields`, and the state it reads. */
 export async function runHealth(
-  app: AnyApp,
+  app: AnyPlugin,
   connection: string,
   call: Recorded & { fields?: Record<string, unknown> }
 ): Promise<Run<ConnectionState>> {
@@ -417,7 +417,7 @@ export interface WebhookRun {
  * throws {@link ExpressionError}.
  */
 export async function runWebhook(
-  app: AnyApp,
+  app: AnyPlugin,
   delivery: {
     headers?: Record<string, string>;
     payload: unknown;

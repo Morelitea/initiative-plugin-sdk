@@ -1,10 +1,10 @@
 /**
  * One typed definition of an app.
  *
- * {@link defineApp} takes everything an app declares and does: its endpoints
+ * {@link definePlugin} takes everything an app declares and does: its endpoints
  * with their handlers, its hooks and schedules, its widgets and surfaces, and
- * its listing. The same object routes Initiative's calls (`createApp`) and
- * becomes the manifest (`initiative-app build`), so nothing is stated twice.
+ * its listing. The same object routes Initiative's calls (`createPlugin`) and
+ * becomes the manifest (`initiative-plugin build`), so nothing is stated twice.
  *
  * {@link defineEndpoint} types one endpoint from its own declaration: its
  * `params` type the handler's arguments and its `returns` type what the
@@ -23,7 +23,7 @@
 
 import type {
   ActorKind,
-  AppScope,
+  PluginScope,
   BundledDashboard,
   BundledDashboardWidget,
   Connection,
@@ -48,17 +48,17 @@ import { FEATURES } from "./contract.js";
 import type { Client } from "./client.js";
 
 /**
- * What every handler is handed as `context`: the value given to `createApp`.
+ * What every handler is handed as `context`: the value given to `createPlugin`.
  *
  * Empty until an app says what it holds, by augmenting this interface:
  *
  * ```ts
- * declare module "initiative-app-sdk/manifest" {
- *   interface AppContext { tracker: TrackerClient }
+ * declare module "initiative-plugin-sdk/manifest" {
+ *   interface PluginContext { tracker: TrackerClient }
  * }
  * ```
  */
-export interface AppContext {}
+export interface PluginContext {}
 
 /** One declared parameter, keyed by its name. */
 export type ParamSpec = Omit<EndpointParam, "key">;
@@ -101,7 +101,7 @@ export interface Call {
   installation: string;
   /** Initiative, acting as whoever the call is for. */
   client: Client;
-  context: AppContext;
+  context: PluginContext;
 }
 
 export interface EndpointCall<P> extends Call {
@@ -296,7 +296,7 @@ export interface DashboardDeclaration<E, W> extends Omit<BundledDashboard, "widg
 }
 
 /**
- * The app's registry listing. `initiative-app build --registry <dir>` writes it
+ * The app's registry listing. `initiative-plugin build --registry <dir>` writes it
  * while `version` is the package's own version.
  */
 export interface ListingDeclaration {
@@ -319,7 +319,7 @@ export interface ListingDeclaration {
    */
   image?: string;
   /** The most the app may ever be granted. Absent: its `scopes`. */
-  scopeCeiling?: Array<Scope | AppScope>;
+  scopeCeiling?: Array<Scope | PluginScope>;
   referenceSectors?: string[];
   /**
    * The Docker Compose service an operator copies to run the image beside
@@ -333,13 +333,13 @@ export interface ListingDeclaration {
   compose?: { service: string; baseUrl: string };
 }
 
-export interface AppDefinition<E, W> {
+export interface PluginDefinition<E, W> {
   /** `<publisher>.<slug>`. */
   publicId: string;
-  /** The catalog id: 14 characters of Crockford base32, minted once (`initiative-app uid`). */
+  /** The catalog id: 14 characters of Crockford base32, minted once (`initiative-plugin uid`). */
   uid: string;
   name: string;
-  scopes?: Array<Scope | AppScope>;
+  scopes?: Array<Scope | PluginScope>;
   /** A declarative app's hosts: every host its requests may reach. Naming them makes the app declarative. */
   hosts?: string[];
   /** How a declarative app's requests carry their credential. Absent: `Authorization: Bearer <token>`. */
@@ -362,16 +362,16 @@ export interface AppDefinition<E, W> {
 }
 
 /** Any app's definition, as the server and the build read it. */
-export type AnyApp = Omit<AppDefinition<any, any>, "endpoints" | "widgets"> & {
+export type AnyPlugin = Omit<PluginDefinition<any, any>, "endpoints" | "widgets"> & {
   endpoints?: Record<string, EndpointDeclaration>;
   widgets?: Record<string, WidgetDeclaration<any>>;
 };
 
 /** The app, declared once. */
-export function defineApp<
+export function definePlugin<
   const E extends Record<string, EndpointDeclaration> = {},
   const W extends Record<string, WidgetDeclaration<E>> = {},
->(definition: AppDefinition<E, W>): AppDefinition<E, W> {
+>(definition: PluginDefinition<E, W>): PluginDefinition<E, W> {
   return definition;
 }
 
@@ -386,7 +386,7 @@ export function endpointId(app: { publicId: string }, name: string): string {
  * `modules` by widget id. A definition naming `hosts` is declarative, and its
  * manifest has no `service` block.
  */
-export function manifestOf(app: AnyApp, modules: Record<string, string> = {}): Manifest {
+export function manifestOf(app: AnyPlugin, modules: Record<string, string> = {}): Manifest {
   const id = (name: string) => endpointId(app, name);
   const blocks: Partial<Manifest> = {
     vendor: app.vendor,
@@ -415,7 +415,7 @@ export function manifestOf(app: AnyApp, modules: Record<string, string> = {}): M
     Object.entries(blocks).filter(([, value]) => value !== undefined)
   ) as Partial<Manifest>;
   return {
-    app_kind: "service",
+    plugin_kind: "service",
     ...(app.hosts
       ? {}
       : { service: { public_id: app.publicId, protocol: 1, ...(app.scopes ? { scopes: [...app.scopes] } : {}) } }),

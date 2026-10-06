@@ -15,8 +15,8 @@ community's GitLab connection and maps the answer itself.
 ## Start
 
 ```sh
-npx initiative-app-sdk init my-app
-cd my-app
+npx initiative-plugin-sdk init my-plugin
+cd my-plugin
 npm install
 npm test
 ```

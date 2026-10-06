@@ -1,5 +1,5 @@
 /**
- * `initiative-app pack`: the app as one listing file, the file a self-hosted
+ * `initiative-plugin pack`: the app as one listing file, the file a self-hosted
  * deployment publishes as its own app.
  *
  * The listing file is the shape a deployment's listing upload
@@ -21,7 +21,7 @@ import { relative, resolve } from "node:path";
 
 import { bundler, compile, registrationOf } from "./build.js";
 import type { Manifest } from "./contract.js";
-import type { AnyApp } from "./define.js";
+import type { AnyPlugin } from "./define.js";
 
 export interface PackOptions {
   /** The app's package directory. */
@@ -43,7 +43,7 @@ export interface Packed {
 }
 
 /** The listing file for an app whose manifest `compile` made. */
-export function listingFile(app: AnyApp, manifest: Manifest, root: string): Packed {
+export function listingFile(app: AnyPlugin, manifest: Manifest, root: string): Packed {
   const listing = app.listing;
   if (!listing) throw new Error("pack needs the app's listing: declare `listing` in its definition");
   const avatar = KEPT_PICTURES.test(listing.avatar) ? readFileSync(resolve(root, listing.avatar)) : null;
@@ -94,7 +94,7 @@ export async function pack(options: PackOptions): Promise<number> {
     [
       `wrote ${relative(process.cwd(), path)}: ${app.publicId} ${version}, uid ${app.uid}`,
       packed.avatar
-        ? `upload it with its picture, ${picture}, or run initiative-app dev --initiative <url> to do both`
+        ? `upload it with its picture, ${picture}, or run initiative-plugin dev --initiative <url> to do both`
         : `${picture} is not PNG, JPEG, GIF or WebP, so the listing shows the deployment's default mark`,
       "",
     ].join("\n")

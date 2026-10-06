@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * `initiative-app`: start, build, pack and upload an app, and keys and
+ * `initiative-plugin`: start, build, pack and upload an app, and keys and
  * manifest checks.
  *
- *   initiative-app init [dir] [--example minimal]
- *   initiative-app build [--app <file>] [--registry <dir>] [--check]
- *   initiative-app pack [--app <file>] [--out <file>]
- *   initiative-app dev --initiative <url> [--api-key <key>] [--app <file>]
- *   initiative-app keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]
- *   initiative-app validate <file.json>   a manifest, or a served manifest document
- *   initiative-app schema                 print the schema a manifest is checked against
- *   initiative-app uid                    mint a catalog uid
+ *   initiative-plugin init [dir] [--example minimal]
+ *   initiative-plugin build [--app <file>] [--registry <dir>] [--check]
+ *   initiative-plugin pack [--app <file>] [--out <file>]
+ *   initiative-plugin dev --initiative <url> [--api-key <key>] [--app <file>]
+ *   initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]
+ *   initiative-plugin validate <file.json>   a manifest, or a served manifest document
+ *   initiative-plugin schema                 print the schema a manifest is checked against
+ *   initiative-plugin uid                    mint a catalog uid
  *
  * `build` reads the app's definition (default `src/app.ts`) and writes
  * `manifest.json`, and with `--registry` the app's registry source; see
@@ -28,7 +28,7 @@ import { join } from "node:path";
 import { build } from "./build.js";
 import { dev } from "./dev.js";
 import { init, mintUid } from "./init.js";
-import { generateAppKeys, type AppKeyAlgorithm } from "./keys.js";
+import { generatePluginKeys, type PluginKeyAlgorithm } from "./keys.js";
 import { pack } from "./pack.js";
 import { manifestSchema, validateDocument, validateManifest } from "./validate.js";
 
@@ -36,14 +36,14 @@ function usage(): never {
   process.stderr.write(
     [
       "usage:",
-      "  initiative-app init [dir] [--example minimal]",
-      "  initiative-app build [--app <file>] [--registry <dir>] [--check]",
-      "  initiative-app pack [--app <file>] [--out <file>]",
-      "  initiative-app dev --initiative <url> [--api-key <key>] [--app <file>]",
-      "  initiative-app keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]",
-      "  initiative-app validate <file.json>",
-      "  initiative-app schema",
-      "  initiative-app uid",
+      "  initiative-plugin init [dir] [--example minimal]",
+      "  initiative-plugin build [--app <file>] [--registry <dir>] [--check]",
+      "  initiative-plugin pack [--app <file>] [--out <file>]",
+      "  initiative-plugin dev --initiative <url> [--api-key <key>] [--app <file>]",
+      "  initiative-plugin keygen [--alg RS256|ES256] [--kid <id>] [--out <dir>]",
+      "  initiative-plugin validate <file.json>",
+      "  initiative-plugin schema",
+      "  initiative-plugin uid",
       "",
     ].join("\n")
   );
@@ -67,7 +67,7 @@ function flags(args: string[], values: string[], switches: string[] = []): Recor
 
 function keygen(args: string[]): number {
   const options = flags(args, ["alg", "kid", "out"]) as Record<string, string>;
-  const alg = (options.alg ?? "RS256") as AppKeyAlgorithm;
+  const alg = (options.alg ?? "RS256") as PluginKeyAlgorithm;
   if (alg !== "RS256" && alg !== "ES256") {
     process.stderr.write(`unsupported --alg ${alg}: use RS256 or ES256\n`);
     return 2;
@@ -81,7 +81,7 @@ function keygen(args: string[]): number {
       return 1;
     }
   }
-  const keys = generateAppKeys({ alg, ...(options.kid ? { kid: options.kid } : {}) });
+  const keys = generatePluginKeys({ alg, ...(options.kid ? { kid: options.kid } : {}) });
   mkdirSync(dir, { recursive: true });
   writeFileSync(keyPath, keys.privateKeyPem, { mode: 0o600, flag: "wx" });
   writeFileSync(jwksPath, `${JSON.stringify(keys.jwks, null, 2)}\n`, { flag: "wx" });

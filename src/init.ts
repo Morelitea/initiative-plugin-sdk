@@ -1,5 +1,5 @@
 /**
- * `initiative-app init [dir] [--example minimal]`: a new app, copied from one
+ * `initiative-plugin init [dir] [--example minimal]`: a new app, copied from one
  * of the SDK's examples, with a uid of its own and its package named after its
  * directory.
  */
@@ -45,8 +45,8 @@ export function init(options: InitOptions): number {
   });
 
   const uid = mintUid();
-  const appPath = join(dir, "src", "app.ts");
-  writeFileSync(appPath, readFileSync(appPath, "utf-8").replace(/uid: "[0-9A-Z]+"/, `uid: "${uid}"`));
+  const pluginPath = join(dir, "src", "app.ts");
+  writeFileSync(pluginPath, readFileSync(pluginPath, "utf-8").replace(/uid: "[0-9A-Z]+"/, `uid: "${uid}"`));
   const packagePath = join(dir, "package.json");
   const manifest = JSON.parse(readFileSync(packagePath, "utf-8")) as Record<string, unknown>;
   // npm's rule for a package name: lowercase, and no character a URL would escape.

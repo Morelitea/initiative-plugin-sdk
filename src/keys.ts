@@ -24,13 +24,13 @@ import {
 } from "node:crypto";
 
 /** The algorithms an app key may use. */
-export type AppKeyAlgorithm = "RS256" | "ES256";
+export type PluginKeyAlgorithm = "RS256" | "ES256";
 
 /** One public key, as a JWK. */
 export interface PublicJwk {
   kty: "RSA" | "EC";
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
   use: "sig";
   n?: string;
   e?: string;
@@ -45,20 +45,20 @@ export interface Jwks {
 }
 
 /** A private key ready to sign with. */
-export interface AppSigningKey {
+export interface PluginSigningKey {
   key: KeyObject;
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
 }
 
-/** What {@link generateAppKeys} returns. */
-export interface GeneratedAppKeys {
+/** What {@link generatePluginKeys} returns. */
+export interface GeneratedPluginKeys {
   /** PKCS#8 PEM. Keep it secret, and out of source control. */
   privateKeyPem: string;
   /** The public half, to register with the deployment. */
   jwks: Jwks;
   kid: string;
-  alg: AppKeyAlgorithm;
+  alg: PluginKeyAlgorithm;
 }
 
 /**
@@ -67,9 +67,9 @@ export interface GeneratedAppKeys {
  * `kid` defaults to the key's RFC 7638 thumbprint, so the same key always gets
  * the same id and two keys never share one.
  */
-export function generateAppKeys(
-  options: { alg?: AppKeyAlgorithm; kid?: string } = {}
-): GeneratedAppKeys {
+export function generatePluginKeys(
+  options: { alg?: PluginKeyAlgorithm; kid?: string } = {}
+): GeneratedPluginKeys {
   const alg = options.alg ?? "RS256";
   const { privateKey } =
     alg === "RS256"
@@ -93,13 +93,13 @@ export function generateAppKeys(
  * The algorithm follows from the key: an RSA key signs `RS256`, a P-256 key
  * signs `ES256`, and any other key is refused.
  */
-export function loadPrivateKey(pem: string, kid?: string): AppSigningKey {
+export function loadPrivateKey(pem: string, kid?: string): PluginSigningKey {
   const key = createPrivateKey(pem);
   return { key, kid: kid || thumbprint(key), alg: algorithmOf(key) };
 }
 
 /** The JWKS for one signing key: its public half, with its `kid`. */
-export function publicJwks(signing: AppSigningKey): Jwks {
+export function publicJwks(signing: PluginSigningKey): Jwks {
   const jwk = createPublicKey(signing.key).export({ format: "jwk" }) as Record<
     string,
     string
@@ -120,7 +120,7 @@ export function publicJwks(signing: AppSigningKey): Jwks {
 }
 
 /** The algorithm a key signs with, from its type. */
-export function algorithmOf(key: KeyObject): AppKeyAlgorithm {
+export function algorithmOf(key: KeyObject): PluginKeyAlgorithm {
   if (key.asymmetricKeyType === "rsa") return "RS256";
   if (key.asymmetricKeyType === "ec" && key.asymmetricKeyDetails?.namedCurve === "prime256v1") {
     return "ES256";
@@ -138,7 +138,7 @@ export function algorithmOf(key: KeyObject): AppKeyAlgorithm {
  * what `ieee-p1363` produces.
  */
 export function signJwt(
-  signing: AppSigningKey,
+  signing: PluginSigningKey,
   claims: Record<string, unknown>,
   typ = "JWT"
 ): string {

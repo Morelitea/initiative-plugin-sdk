@@ -17,13 +17,13 @@ import {
   type EndpointParam,
   type Manifest,
 } from "../src/manifest.js";
-import { appDocument } from "../src/validate.js";
+import { pluginDocument } from "../src/validate.js";
 import { SCOPES } from "../src/contract.js";
 import { manifestOf } from "../src/define.js";
-import { issuesApp } from "./support/app.js";
+import { issuesPlugin } from "./support/app.js";
 
 const base = (): Manifest => ({
-  app_kind: "service",
+  plugin_kind: "service",
   service: { public_id: "acme.tracker", protocol: 1 },
   features: [],
 });
@@ -34,7 +34,7 @@ const messages = (problems: Array<{ where: string; message: string }>) =>
 describe("manifestSchema", () => {
   it("ships beside the module", () => {
     const schema = manifestSchema();
-    expect(schema.$id).toContain("app-manifest");
+    expect(schema.$id).toContain("plugin-manifest");
     expect((schema.properties as Record<string, unknown>).service).toBeDefined();
   });
 
@@ -294,7 +294,7 @@ describe("the document a registrar actually fetches", () => {
   // the well-known path is well-formed and unregisterable — which is exactly
   // how the reference app was wrong, with nothing on either side saying so.
   it("wraps a manifest in the envelope a registrar requires", () => {
-    const document = appDocument(base(), { uid: "K7M2QX8N4TVB9C", name: "Tracker" });
+    const document = pluginDocument(base(), { uid: "K7M2QX8N4TVB9C", name: "Tracker" });
 
     expect(document.protocol_version).toBe(1);
     expect(document.public_id).toBe("acme.tracker");
@@ -306,13 +306,13 @@ describe("the document a registrar actually fetches", () => {
   it("leaves out what was not supplied rather than sending nulls", () => {
     // The document is hashed and re-checked; a key present as null is a byte
     // difference that says nothing.
-    const document = appDocument(base());
+    const document = pluginDocument(base());
     expect("uid" in document).toBe(false);
     expect("name" in document).toBe(false);
   });
 
-  it("accepts what appDocument builds", () => {
-    expect(validateDocument(appDocument(base()))).toEqual([]);
+  it("accepts what pluginDocument builds", () => {
+    expect(validateDocument(pluginDocument(base()))).toEqual([]);
   });
 
   it("refuses a bare manifest, which is the mistake worth catching", () => {
@@ -323,12 +323,12 @@ describe("the document a registrar actually fetches", () => {
   });
 
   it("refuses a protocol the registrar does not speak", () => {
-    const problems = validateDocument({ ...appDocument(base()), protocol_version: 2 });
+    const problems = validateDocument({ ...pluginDocument(base()), protocol_version: 2 });
     expect(messages(problems)).toContain("/protocol_version");
   });
 
   it("refuses a kind that is not an app", () => {
-    const problems = validateDocument({ ...appDocument(base()), kind: "tool" });
+    const problems = validateDocument({ ...pluginDocument(base()), kind: "tool" });
     expect(messages(problems)).toContain("/kind");
   });
 
@@ -336,13 +336,13 @@ describe("the document a registrar actually fetches", () => {
     // The registration is matched by the outer id and the capabilities are
     // namespaced under the inner one, so a mismatch is a real app that half
     // works, and nothing downstream reports it.
-    const problems = validateDocument({ ...appDocument(base()), public_id: "acme.other" });
+    const problems = validateDocument({ ...pluginDocument(base()), public_id: "acme.other" });
 
     expect(messages(problems)).toContain("but the definition declares 'acme.tracker'");
   });
 
   it("reports the manifest's own problems, at their path inside it", () => {
-    const problems = validateDocument(appDocument({ ...base(), features: ["endpoints"] }));
+    const problems = validateDocument(pluginDocument({ ...base(), features: ["endpoints"] }));
 
     expect(messages(problems)).toContain("/definition/features");
   });
@@ -936,7 +936,7 @@ describe("connections Initiative runs", () => {
         { key: "client_id", type: "string", required: true, label: { en: "Client id" } },
         { key: "client_secret", type: "secret", required: true, label: { en: "Secret" } },
         { key: "app_slug", type: "string", required: true, label: { en: "Slug" } },
-        { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+        { key: "plugin_id", type: "string", required: true, label: { en: "App id" } },
         { key: "private_key", type: "secret", required: true, label: { en: "Key" } },
         { key: "webhook_secret", type: "secret", required: true, label: { en: "Hook" } },
       ],
@@ -949,7 +949,7 @@ describe("connections Initiative runs", () => {
           default_events: ["issues", "installation_target"],
         },
         values: {
-          app_id: "id",
+          plugin_id: "id",
           app_slug: "slug",
           client_id: "client_id",
           client_secret: "client_secret",
@@ -991,7 +991,7 @@ describe("connections Initiative runs", () => {
           type: "jwt_bearer",
           exchange_url:
             "https://api.github.com/app/installations/{installation_id}/access_tokens",
-          iss: "{vendor.app_id}",
+          iss: "{vendor.plugin_id}",
           key: "{vendor.private_key}",
           alg: "RS256",
           lifetime: 540,
@@ -1112,13 +1112,13 @@ describe("connections Initiative runs", () => {
   it("holds a vendor setup to the vendor block: declared, kept secret, written once", () => {
     const manifest = github();
     manifest.vendor!.setup!.values = {
-      app_ids: "id",
+      plugin_ids: "id",
       app_slug: "client_secret",
       client_id: "client_id",
       client_secret: "client_secret",
     };
     const text = messages(validateManifest(manifest));
-    expect(text).toContain("/vendor/setup/values/app_ids: 'app_ids' is not a field of the vendor block");
+    expect(text).toContain("/vendor/setup/values/plugin_ids: 'plugin_ids' is not a field of the vendor block");
     expect(text).toContain(
       "/vendor/setup/values/app_slug: 'client_secret' is a secret, and 'app_slug' is not a secret field"
     );
@@ -1129,11 +1129,11 @@ describe("connections Initiative runs", () => {
 
   it("refuses a vendor setup outside the contract", () => {
     const changes: Array<(setup: Record<string, any>) => void> = [
-      (setup) => (setup.kind = "gitlab_app"),
+      (setup) => (setup.kind = "gitlab_plugin"),
       (setup) => (setup.app.url = "http://initiative.example"),
       (setup) => (setup.app.default_permissions.issues = "admin"),
       (setup) => setup.app.default_events.push("issues"),
-      (setup) => (setup.values.app_id = "node_id"),
+      (setup) => (setup.values.plugin_id = "node_id"),
       (setup) => (setup.values = {}),
       (setup) => delete setup.app,
     ];
@@ -1187,7 +1187,7 @@ describe("schedules", () => {
 });
 
 describe("declarative apps", () => {
-  const declarative = (): Manifest => structuredClone(manifestOf(issuesApp()));
+  const declarative = (): Manifest => structuredClone(manifestOf(issuesPlugin()));
   const problems = (manifest: Manifest) => messages(validateManifest(manifest, { publicId: "acme.issues" }));
 
   it("accepts one that uses each term", () => {

@@ -12,15 +12,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { manifestOf } from "../src/define.js";
-import { generateAppKeys, jwkThumbprint, loadPrivateKey, signJwt } from "../src/keys.js";
-import { createApp, serve, type AppHandler } from "../src/server.js";
+import { generatePluginKeys, jwkThumbprint, loadPrivateKey, signJwt } from "../src/keys.js";
+import { createPlugin, serve, type PluginHandler } from "../src/server.js";
 import { CONTEXT_TOKEN_TYPE, HANDOFF_TOKEN_TYPE } from "../src/tokens.js";
-import { issuesApp, trackerApp } from "./support/app.js";
+import { issuesPlugin, trackerPlugin } from "./support/app.js";
 
 const BASE = "https://initiative.example.com/api/v1";
-const platform = generateAppKeys({ alg: "RS256", kid: "platform-1" });
-const stranger = generateAppKeys({ alg: "RS256", kid: "platform-1" });
-const appKeys = generateAppKeys({ alg: "ES256", kid: "app-1" });
+const platform = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
+const stranger = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
+const pluginKeys = generatePluginKeys({ alg: "ES256", kid: "plugin-1" });
 const MODULES = { "open-count": "globalThis.render = function () {};" };
 
 function sign(
@@ -32,11 +32,11 @@ function sign(
   return signJwt(loadPrivateKey(pem, "platform-1"), {
     jti: randomUUID(),
     iss: "initiative",
-    aud: "initiative-app:acme.tracker",
+    aud: "initiative-plugin:acme.tracker",
     iat: now,
     exp: now + 60,
     community_ref: "gapp_1",
-    app_install_id: 1,
+    plugin_install_id: 1,
     ...claims,
   }, typ);
 }
@@ -48,21 +48,21 @@ const handoffToken = (claims: Record<string, unknown> = {}) =>
   sign({ sub: "uapp_alice", surface_id: "board", initiative_id: 4, community_admin: true, ...claims }, undefined, HANDOFF_TOKEN_TYPE);
 
 const outbound = (async (input: string | URL | Request) => {
-  if (String(input) === "https://initiative.example.com/api/v1/app-platform/jwks.json") return Response.json(platform.jwks);
+  if (String(input) === "https://initiative.example.com/api/v1/plugin-platform/jwks.json") return Response.json(platform.jwks);
   throw new Error(`unexpected call to ${input}`);
 }) as typeof fetch;
 
-let handler: AppHandler;
-let seen: ReturnType<typeof trackerApp>["seen"];
+let handler: PluginHandler;
+let seen: ReturnType<typeof trackerPlugin>["seen"];
 let logs: string[];
 
-function start(options: Record<string, unknown> = {}): AppHandler {
-  const tracker = trackerApp();
+function start(options: Record<string, unknown> = {}): PluginHandler {
+  const tracker = trackerPlugin();
   seen = tracker.seen;
   logs = [];
-  return createApp(tracker.app, {
+  return createPlugin(tracker.app, {
     baseUrl: BASE,
-    key: { privateKey: appKeys.privateKeyPem, kid: "app-1" },
+    key: { privateKey: pluginKeys.privateKeyPem, kid: "plugin-1" },
     manifest: manifestOf(tracker.app, MODULES),
     fetch: outbound,
     log: { info: () => {}, warn: () => {}, error: (message) => logs.push(message) },
@@ -106,13 +106,13 @@ describe("what the app publishes", () => {
   it("serves its public key, and nothing private", async () => {
     const jwks = await read(get("/.well-known/jwks.json"));
     expect(jwks.keys).toHaveLength(1);
-    expect(jwks.keys[0]).toMatchObject({ kid: "app-1", kty: "EC", alg: "ES256" });
+    expect(jwks.keys[0]).toMatchObject({ kid: "plugin-1", kty: "EC", alg: "ES256" });
     expect(jwks.keys[0]).not.toHaveProperty("d");
   });
 
   it("serves its manifest document at the well-known path", async () => {
-    const tracker = trackerApp();
-    expect(await read(get("/.well-known/initiative-app.json"))).toEqual({
+    const tracker = trackerPlugin();
+    expect(await read(get("/.well-known/initiative-plugin.json"))).toEqual({
       protocol_version: 1,
       public_id: "acme.tracker",
       kind: "app",
@@ -188,7 +188,7 @@ describe("endpoint calls", () => {
   const refusals: Array<[string, () => Promise<{ status: number; body: Record<string, string> }>, number, string]> = [
     ["no token", () => invoke("open-tickets", {}, ""), 401, "unauthorized"],
     ["a key the deployment never published", () => invoke("open-tickets", {}, sign({ scope: "endpoint", endpoint_id: "app.acme.tracker.open-tickets" }, stranger.privateKeyPem)), 401, "unauthorized"],
-    ["a token for another app", () => invoke("open-tickets", {}, contextToken("open-tickets", { aud: "initiative-app:acme.other" })), 401, "unauthorized"],
+    ["a token for another app", () => invoke("open-tickets", {}, contextToken("open-tickets", { aud: "initiative-plugin:acme.other" })), 401, "unauthorized"],
     ["a token for another endpoint", () => invoke("open-tickets", {}, contextToken("projects")), 400, "this token is for 'app.acme.tracker.projects'"],
     ["a lifecycle token", () => invoke("open-tickets", {}, hookToken("webhook")), 400, "this token is not for calling an endpoint"],
     ["an endpoint the app does not declare", () => invoke("delete-everything", {}), 400, "does not offer"],
@@ -288,15 +288,15 @@ describe("surfaces", () => {
 describe("starting", () => {
   let dir: string;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "initiative-app-"));
+    dir = mkdtempSync(join(tmpdir(), "initiative-plugin-"));
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it("generates a key on first start, keeps it, and uses it again", async () => {
     const first = start({ key: undefined, dataDir: dir });
     const kid = (await read(first(new Request("http://app.test/.well-known/jwks.json")))).keys[0].kid;
-    expect(statSync(join(dir, "app-key.pem")).mode & 0o777).toBe(0o600);
-    const again = start({ key: undefined, env: { INITIATIVE_APP_DATA_DIR: dir } });
+    expect(statSync(join(dir, "plugin-key.pem")).mode & 0o777).toBe(0o600);
+    const again = start({ key: undefined, env: { INITIATIVE_PLUGIN_DATA_DIR: dir } });
     expect((await read(again(new Request("http://app.test/.well-known/jwks.json")))).keys[0].kid).toBe(kid);
   });
 
@@ -308,23 +308,23 @@ describe("starting", () => {
       log: { info: (message: string) => infos.push(message), warn: () => {}, error: () => {} },
       env: {
         INITIATIVE_BASE_URL: BASE,
-        INITIATIVE_APP_PRIVATE_KEY: Buffer.from(appKeys.privateKeyPem).toString("base64"),
-        INITIATIVE_APP_KEY_ID: "env-1",
+        INITIATIVE_PLUGIN_PRIVATE_KEY: Buffer.from(pluginKeys.privateKeyPem).toString("base64"),
+        INITIATIVE_PLUGIN_KEY_ID: "env-1",
       },
     });
     expect((await read(fromEnv(new Request("http://app.test/.well-known/jwks.json")))).keys[0].kid).toBe("env-1");
-    expect(infos).toEqual([`app key fingerprint: ${jwkThumbprint(appKeys.jwks.keys[0])} (kid env-1)`]);
+    expect(infos).toEqual([`app key fingerprint: ${jwkThumbprint(pluginKeys.jwks.keys[0])} (kid env-1)`]);
     expect(() => start({ baseUrl: undefined })).toThrow(/INITIATIVE_BASE_URL/);
   });
 
   it("refuses a built manifest the definition no longer matches", () => {
-    const stale = manifestOf(trackerApp().app, MODULES);
+    const stale = manifestOf(trackerPlugin().app, MODULES);
     stale.endpoints = stale.endpoints!.slice(1);
-    expect(() => start({ manifest: stale })).toThrow(/run initiative-app build/);
+    expect(() => start({ manifest: stale })).toThrow(/run initiative-plugin build/);
   });
 
   it("refuses a declarative app, which Initiative answers from its manifest", () => {
-    expect(() => createApp(issuesApp(), { baseUrl: BASE })).toThrow(/declarative app has no service to run/);
+    expect(() => createPlugin(issuesPlugin(), { baseUrl: BASE })).toThrow(/declarative app has no service to run/);
   });
 
   it("serves on node:http", async () => {

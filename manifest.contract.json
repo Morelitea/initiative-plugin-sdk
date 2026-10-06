@@ -1,9 +1,9 @@
 {
-  "$comment": "The Initiative app contract: the vocabulary an app manifest draws on and the shape it takes. Hand-authored HERE, in the initiative-app-sdk repository, and nowhere else. Running `npm run generate` in that repository rewrites schemas/app-manifest.json and src/contract.ts from this file. Initiative vendors this file to derive its validator's constants and hold its normalizer to the field inventory; the copies under initiative's backend/vendor/app-kit and frontend/src/contract are refreshed by backend/scripts/refresh_app_kit.py and are not edited there. Edit this; never the generated output. A manifest describes an app's API and nothing about how a consumer PRESENTS it: there is no term here for a control, a picker, a default or a bound, because what a step looks like on somebody's canvas is that consumer's to decide and ours to stay out of.",
+  "$comment": "The Initiative app contract: the vocabulary an app manifest draws on and the shape it takes. Hand-authored HERE, in the initiative-plugin-sdk repository, and nowhere else. Running `npm run generate` in that repository rewrites schemas/plugin-manifest.json and src/contract.ts from this file. Initiative vendors this file to derive its validator's constants and hold its normalizer to the field inventory; the copies under initiative's backend/vendor/plugin-kit and frontend/src/contract are refreshed by backend/scripts/refresh_plugin_kit.py and are not edited there. Edit this; never the generated output. A manifest describes an app's API and nothing about how a consumer PRESENTS it: there is no term here for a control, a picker, a default or a bound, because what a step looks like on somebody's canvas is that consumer's to decide and ours to stay out of.",
   "schema": {
-    "$id": "https://initiative.morels.me/schemas/app-manifest-v1.json",
+    "$id": "https://initiative.morels.me/schemas/plugin-manifest-v1.json",
     "title": "Initiative app manifest (the 'definition' body)",
-    "description": "What an app declares it can do. An app is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks and webhook events Initiative runs itself from the requests and JSONata expressions written here; one app is never both. This is the 'definition' field of the document served at /.well-known/initiative-app.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, and the bounds and unique ids of schedules are enforced by the platform on publish and are not expressible here."
+    "description": "What an app declares it can do. An app is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks and webhook events Initiative runs itself from the requests and JSONata expressions written here; one app is never both. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, and the bounds and unique ids of schedules are enforced by the platform on publish and are not expressible here."
   },
   "charsets": {
     "identifier": "-0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -232,7 +232,7 @@
     "widgetOptions": 12,
     "valuesPerOption": 24,
     "identityKeyParts": 4,
-    "appScopes": 24,
+    "pluginScopes": 24,
     "schedules": 8,
     "scheduleMinMinutes": 5,
     "scheduleMaxMinutes": 1440,
@@ -787,7 +787,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": "urlLength",
-          "description": "The JWT's issuer, normally '{vendor.app_id}'. May name a vendor value as '{vendor.<key>}' and one of this connection's own fields as '{<key>}'."
+          "description": "The JWT's issuer, normally '{vendor.plugin_id}'. May name a vendor value as '{vendor.<key>}' and one of this connection's own fields as '{<key>}'."
         },
         "key": {
           "type": "string",
@@ -810,7 +810,7 @@
     },
     "webhooks": {
       "type": "object",
-      "description": "The vendor's webhooks, received by Initiative at one address per app on the deployment, '/api/v1/app-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the app's webhook hook once for each. A container app's hook receives each delivery; a declarative app maps it with 'events' and 'status' instead.",
+      "description": "The vendor's webhooks, received by Initiative at one address per app on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the app's webhook hook once for each. A container app's hook receives each delivery; a declarative app maps it with 'events' and 'status' instead.",
       "required": [
         "verify",
         "dedup",
@@ -950,7 +950,7 @@
       "patternForm": "plus",
       "description": "Namespaced under the app's own service id \u2014 'app.<public_id>.<name>'. The prefix is checked against the declaring registration at ingress."
     },
-    "appScope": {
+    "pluginScope": {
       "type": "string",
       "patternFrom": "publicId",
       "patternForm": "dotted",
@@ -1752,11 +1752,11 @@
   },
   "manifest": {
     "required": [
-      "app_kind",
+      "plugin_kind",
       "features"
     ],
     "properties": {
-      "app_kind": {
+      "plugin_kind": {
         "const": "service",
         "description": "The kind every app manifest has, container or declarative: a declarative app is one with no 'service' block."
       },
@@ -1781,7 +1781,7 @@
             "type": "array",
             "maxItems": {
               "wholeOf": "scope",
-              "plus": "appScopes"
+              "plus": "pluginScopes"
             },
             "uniqueItems": true,
             "items": {
@@ -1790,11 +1790,11 @@
                   "enum": "scope"
                 },
                 {
-                  "ref": "appScope"
+                  "ref": "pluginScope"
                 }
               ]
             },
-            "description": "The scopes this app asks a community to grant: what its installation and member tokens act with. The fixed scopes, and 'apps:<public_id>' for each app this one calls (at most {appScopes} of those). The community grants some or all of them when it installs the app, and a token never carries more than was granted. Writing implies reading. Absent means none."
+            "description": "The scopes this app asks a community to grant: what its installation and member tokens act with. The fixed scopes, and 'apps:<public_id>' for each app this one calls (at most {pluginScopes} of those). The community grants some or all of them when it installs the app, and a token never carries more than was granted. Writing implies reading. Absent means none."
           }
         },
         "description": "A container app's service, which Initiative calls. Absent for a declarative app, whose public id is its listing's."

@@ -8,12 +8,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   algorithmOf,
-  generateAppKeys,
+  generatePluginKeys,
   jwkThumbprint,
   loadPrivateKey,
   publicJwks,
   signJwt,
-  type AppKeyAlgorithm,
+  type PluginKeyAlgorithm,
 } from "../src/keys.js";
 
 function decode(segment: string): Record<string, unknown> {
@@ -31,8 +31,8 @@ function verifiesWith(token: string, jwk: Record<string, unknown>): boolean {
     : verify("sha256", input, key, raw);
 }
 
-describe.each<AppKeyAlgorithm>(["RS256", "ES256"])("%s keys", (alg) => {
-  const keys = generateAppKeys({ alg });
+describe.each<PluginKeyAlgorithm>(["RS256", "ES256"])("%s keys", (alg) => {
+  const keys = generatePluginKeys({ alg });
 
   it("writes a PKCS#8 private key and a one-entry JWKS", () => {
     expect(keys.privateKeyPem).toContain("-----BEGIN PRIVATE KEY-----");
@@ -62,7 +62,7 @@ describe.each<AppKeyAlgorithm>(["RS256", "ES256"])("%s keys", (alg) => {
   });
 
   it("does not verify with another key", () => {
-    const other = generateAppKeys({ alg });
+    const other = generatePluginKeys({ alg });
     const token = signJwt(loadPrivateKey(keys.privateKeyPem, keys.kid), { n: 1 });
     expect(verifiesWith(token, other.jwks.keys[0] as never)).toBe(false);
   });
@@ -74,20 +74,20 @@ describe.each<AppKeyAlgorithm>(["RS256", "ES256"])("%s keys", (alg) => {
 
 describe("kid", () => {
   it("defaults to a thumbprint, distinct per key", () => {
-    const a = generateAppKeys();
-    const b = generateAppKeys();
+    const a = generatePluginKeys();
+    const b = generatePluginKeys();
     expect(a.kid).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(a.kid).not.toBe(b.kid);
   });
 
   it("takes one you choose", () => {
-    const keys = generateAppKeys({ alg: "ES256", kid: "2026-09" });
+    const keys = generatePluginKeys({ alg: "ES256", kid: "2026-09" });
     expect(keys.kid).toBe("2026-09");
     expect(keys.jwks.keys[0].kid).toBe("2026-09");
   });
 
   it("is the key's thumbprint when a loaded key names none", () => {
-    const keys = generateAppKeys();
+    const keys = generatePluginKeys();
     expect(loadPrivateKey(keys.privateKeyPem).kid).toBe(keys.kid);
   });
 });
@@ -111,17 +111,17 @@ describe("fingerprint", () => {
 
 describe("algorithm", () => {
   it("defaults to RS256", () => {
-    expect(generateAppKeys().alg).toBe("RS256");
+    expect(generatePluginKeys().alg).toBe("RS256");
   });
 
   it("follows the key's type", () => {
-    const rsa = loadPrivateKey(generateAppKeys({ alg: "RS256" }).privateKeyPem, "a");
-    const ec = loadPrivateKey(generateAppKeys({ alg: "ES256" }).privateKeyPem, "b");
+    const rsa = loadPrivateKey(generatePluginKeys({ alg: "RS256" }).privateKeyPem, "a");
+    const ec = loadPrivateKey(generatePluginKeys({ alg: "ES256" }).privateKeyPem, "b");
     expect(algorithmOf(rsa.key)).toBe("RS256");
     expect(algorithmOf(ec.key)).toBe("ES256");
   });
 
   it("refuses an unsupported algorithm", () => {
-    expect(() => generateAppKeys({ alg: "HS256" as never })).toThrow(/unsupported/);
+    expect(() => generatePluginKeys({ alg: "HS256" as never })).toThrow(/unsupported/);
   });
 });

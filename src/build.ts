@@ -1,5 +1,5 @@
 /**
- * `initiative-app build`: the files an app's definition produces.
+ * `initiative-plugin build`: the files an app's definition produces.
  *
  * - `manifest.json`: the manifest, with each widget's module bundled into its
  *   `module_source`, after `validateManifest` has passed it. That parses
@@ -25,7 +25,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { CAPS } from "./contract.js";
-import { manifestOf, type AnyApp, type ListingDeclaration } from "./define.js";
+import { manifestOf, type AnyPlugin, type ListingDeclaration } from "./define.js";
 import type { Manifest } from "./contract.js";
 import { validateManifest } from "./validate.js";
 
@@ -46,20 +46,20 @@ export async function bundler(command: string): Promise<Esbuild | null> {
   try {
     return await import("esbuild");
   } catch {
-    process.stderr.write(`initiative-app ${command} bundles with esbuild: npm install --save-dev esbuild\n`);
+    process.stderr.write(`initiative-plugin ${command} bundles with esbuild: npm install --save-dev esbuild\n`);
     return null;
   }
 }
 
 /** What a definition builds: the app and its manifest, or every problem that stops it. */
-export type Compiled = { app: AnyApp; manifest: Manifest; problems?: never } | { problems: string[] };
+export type Compiled = { app: AnyPlugin; manifest: Manifest; problems?: never } | { problems: string[] };
 
 /**
  * Load the app's definition, bundle its widgets and check the manifest they
  * make, with nothing written.
  */
 export async function compile(esbuild: Esbuild, root: string, entry: string): Promise<Compiled> {
-  const app = await loadApp(esbuild, root, entry);
+  const app = await loadPlugin(esbuild, root, entry);
   const modules: Record<string, string> = {};
   const problems: string[] = [];
   for (const [id, widget] of Object.entries(app.widgets ?? {})) {
@@ -119,7 +119,7 @@ export async function build(options: BuildOptions): Promise<number> {
     if (options.check) {
       const current = existsSync(path) ? readFileSync(path) : null;
       if (!current || !current.equals(Buffer.from(content))) {
-        process.stderr.write(`${name} is out of date: run initiative-app build\n`);
+        process.stderr.write(`${name} is out of date: run initiative-plugin build\n`);
         stale = true;
       }
     } else {
@@ -132,8 +132,8 @@ export async function build(options: BuildOptions): Promise<number> {
 }
 
 /** The app's definition, compiled from its TypeScript and imported. */
-async function loadApp(esbuild: Esbuild, root: string, entry: string): Promise<AnyApp> {
-  const outfile = join(root, "node_modules", ".cache", "initiative-app", `app-${process.pid}-${Date.now()}.mjs`);
+async function loadPlugin(esbuild: Esbuild, root: string, entry: string): Promise<AnyPlugin> {
+  const outfile = join(root, "node_modules", ".cache", "initiative-plugin", `plugin-${process.pid}-${Date.now()}.mjs`);
   await esbuild.build({
     entryPoints: [resolve(root, entry)],
     outfile,
@@ -144,7 +144,7 @@ async function loadApp(esbuild: Esbuild, root: string, entry: string): Promise<A
     logLevel: "error",
   });
   try {
-    const loaded = (await import(pathToFileURL(outfile).href)) as { default?: AnyApp };
+    const loaded = (await import(pathToFileURL(outfile).href)) as { default?: AnyPlugin };
     const app = loaded.default;
     if (!app || typeof app.publicId !== "string") {
       throw new Error(`${entry} must export the app's definition as its default export`);
@@ -185,7 +185,7 @@ async function bundleWidget(esbuild: Esbuild, root: string, module: string): Pro
  * runs no hooks and asks for no scopes, and only a container app's listing
  * names an image.
  */
-function kindProblems(app: AnyApp): string[] {
+function kindProblems(app: AnyPlugin): string[] {
   const problems: string[] = [];
   if (app.hosts) {
     if (Object.keys(app.hooks ?? {}).length) problems.push("hooks: a declarative app runs no hooks");
@@ -213,7 +213,7 @@ function composeProblems({ service, baseUrl }: NonNullable<ListingDeclaration["c
 }
 
 /** The registry source listing: what the catalogue shows, this version, and the registration, a container's or a declarative app's. */
-function listingSource(app: AnyApp, avatar: Buffer): Record<string, unknown> {
+function listingSource(app: AnyPlugin, avatar: Buffer): Record<string, unknown> {
   const listing = app.listing!;
   return {
     schema: 1,
@@ -241,7 +241,7 @@ function listingSource(app: AnyApp, avatar: Buffer): Record<string, unknown> {
 }
 
 /** A listing's registration: the app's kind, and a container's image and Compose service. */
-export function registrationOf(app: AnyApp): Record<string, unknown> {
+export function registrationOf(app: AnyPlugin): Record<string, unknown> {
   const listing = app.listing!;
   return {
     ...(app.hosts ? { kind: "declarative" } : { kind: "container", image: listing.image }),

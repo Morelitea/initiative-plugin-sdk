@@ -8,9 +8,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CAPS } from "../src/contract.js";
 import { evaluate, runAfterConnect, runEndpoint, runHealth, runWebhook } from "../src/testing.js";
-import { issuesApp } from "./support/app.js";
+import { issuesPlugin } from "./support/app.js";
 
-const app = issuesApp();
+const app = issuesPlugin();
 const now = "2026-10-02T12:00:00.000Z";
 const workspace = { workspace: { owner: "acme" } };
 
@@ -141,7 +141,7 @@ describe("runAfterConnect", () => {
   });
 
   describe("with steps", () => {
-    const stepped = issuesApp();
+    const stepped = issuesPlugin();
     stepped.connections!.workspace.flow!.after_connect = {
       steps: [
         { name: "installation", request: { method: "GET", url: '"https://api.tracker.example/installations/" & params.installation_id' } },

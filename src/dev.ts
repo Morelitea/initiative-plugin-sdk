@@ -1,5 +1,5 @@
 /**
- * `initiative-app dev --initiative <url> --api-key <key>`: a declarative app
+ * `initiative-plugin dev --initiative <url> --api-key <key>`: a declarative app
  * on your own deployment, uploaded again each time its source changes.
  *
  * Each pass builds the app, packs its listing file (`pack.ts`) and uploads it

@@ -135,7 +135,7 @@ export const CAPS = {
   widgetOptions: 12,
   valuesPerOption: 24,
   identityKeyParts: 4,
-  appScopes: 24,
+  pluginScopes: 24,
   schedules: 8,
   scheduleMinMinutes: 5,
   scheduleMaxMinutes: 1440,
@@ -217,7 +217,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["app_kind", "service", "features", "default_name", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
 } as const;
 
 export type Identifier = string;
@@ -570,7 +570,7 @@ export interface ConnectionToken {
    */
   exchange_url: string;
   /**
-   * The JWT's issuer, normally '{vendor.app_id}'. May name a vendor value as
+   * The JWT's issuer, normally '{vendor.plugin_id}'. May name a vendor value as
    * '{vendor.<key>}' and one of this connection's own fields as '{<key>}'.
    */
   iss: string;
@@ -588,7 +588,7 @@ export interface ConnectionToken {
 
 /**
  * The vendor's webhooks, received by Initiative at one address per app on the
- * deployment, '/api/v1/app-hooks/<public_id>'. Initiative checks each
+ * deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each
  * delivery's signature, drops one it has already delivered, finds the
  * communities it belongs to by a value in its body, and forwards it to the
  * app's webhook hook once for each. A container app's hook receives each
@@ -696,7 +696,7 @@ export type NamespacedId = string;
  * another directly; the call goes through it, and the app called is handed its
  * own references for whoever the call is for.
  */
-export type AppScope = `apps:${string}`;
+export type PluginScope = `apps:${string}`;
 
 export interface Endpoint {
   id: NamespacedId;
@@ -1237,7 +1237,7 @@ export interface WebhookStatus {
  * `hosts` and no service, and whose endpoints, connection checks and webhook
  * events Initiative runs itself from the requests and JSONata expressions
  * written here; one app is never both. This is the 'definition' field of the
- * document served at /.well-known/initiative-app.json, NOT that whole document:
+ * document served at /.well-known/initiative-plugin.json, NOT that whole document:
  * a registrar also requires protocol_version, public_id and kind alongside it,
  * and refuses a definition served bare. Generated from the platform's own
  * validator vocabulary. A manifest that satisfies this schema is well-formed,
@@ -1255,7 +1255,7 @@ export interface Manifest {
    * The kind every app manifest has, container or declarative: a declarative
    * app is one with no 'service' block.
    */
-  app_kind: "service";
+  plugin_kind: "service";
   /**
    * A container app's service, which Initiative calls. Absent for a declarative
    * app, whose public id is its listing's.
@@ -1274,7 +1274,7 @@ export interface Manifest {
      * all of them when it installs the app, and a token never carries more than
      * was granted. Writing implies reading. Absent means none.
      */
-    scopes?: Array<Scope | AppScope>;
+    scopes?: Array<Scope | PluginScope>;
   };
   /**
    * What this app contributes. Cross-checked against the blocks present in both

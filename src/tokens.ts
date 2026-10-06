@@ -2,7 +2,7 @@
  * Verifying the tokens Initiative signs when it reaches the app.
  *
  * Both kinds are RS256 JWTs signed with the deployment's key and published in
- * its JWKS at `/api/v1/app-platform/jwks.json`:
+ * its JWKS at `/api/v1/plugin-platform/jwks.json`:
  *
  * - **Context token**, on every call to the app (`Authorization: Bearer …`).
  *   Scope `endpoint` is a call to one endpoint, named by `endpoint_id`; scope
@@ -14,7 +14,7 @@
  *   for one use.
  *
  * Each is checked the same way: the `kid` against the deployment's JWKS, the
- * signature, `iss` = `initiative`, `aud` = `initiative-app:<public id>`, and
+ * signature, `iss` = `initiative`, `aud` = `initiative-plugin:<public id>`, and
  * `exp`/`iat` against the clock with a small leeway.
  */
 
@@ -32,7 +32,7 @@ import { ACTOR_KINDS, type ActorKind } from "./contract.js";
 export type ContextScope = "endpoint" | "lifecycle";
 
 /** Where the deployment publishes its verification keys. */
-export const JWKS_PATH = "/api/v1/app-platform/jwks.json";
+export const JWKS_PATH = "/api/v1/plugin-platform/jwks.json";
 
 /** How long a fetched key set is reused before a refetch is considered. */
 export const JWKS_CACHE_SECONDS = 300;
@@ -58,7 +58,7 @@ export interface InitiativeTokenClaims {
    */
   community_ref: string;
   /** The installation within that community. */
-  app_install_id: number;
+  plugin_install_id: number;
 }
 
 export interface ContextClaims extends InitiativeTokenClaims {
@@ -113,7 +113,7 @@ export class ContextTokenError extends Error {}
 
 /** The audience a token for `publicId` names. */
 export function audienceFor(publicId: string): string {
-  return `initiative-app:${publicId}`;
+  return `initiative-plugin:${publicId}`;
 }
 
 interface Jwk {

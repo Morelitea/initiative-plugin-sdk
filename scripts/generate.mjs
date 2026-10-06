@@ -6,7 +6,7 @@
  * say: the vocabulary (enums, ladders, caps, character sets) and the shape (each
  * object's fields). Two things are generated from it and committed beside it:
  *
- * - `schemas/app-manifest.json` — the JSON Schema an author validates against.
+ * - `schemas/plugin-manifest.json` — the JSON Schema an author validates against.
  * - `src/contract.ts` — the same vocabulary and every object's shape as
  *   TypeScript, so no contract term exists without its type and the SDK's
  *   types cannot disagree with the schema it ships.
@@ -238,7 +238,7 @@ function declaration(name, node) {
 // --- write or check --------------------------------------------------------
 
 const outputs = [
-  [join(root, "schemas", "app-manifest.json"), JSON.stringify(buildSchema(), null, 2) + "\n"],
+  [join(root, "schemas", "plugin-manifest.json"), JSON.stringify(buildSchema(), null, 2) + "\n"],
   [join(root, "src", "contract.ts"), buildTypes()],
 ];
 

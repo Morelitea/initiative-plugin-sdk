@@ -40,10 +40,10 @@ import {
 import { ExpressionError, parseExpression } from "./expression.js";
 
 /** Where an app serves its manifest document. */
-export const MANIFEST_PATH = "/.well-known/initiative-app.json";
+export const MANIFEST_PATH = "/.well-known/initiative-plugin.json";
 
 /** The wire protocol this SDK speaks. */
-export const APP_PROTOCOL_VERSION = 1;
+export const PLUGIN_PROTOCOL_VERSION = 1;
 
 /**
  * The document served at {@link MANIFEST_PATH}, of which {@link Manifest} is one
@@ -51,7 +51,7 @@ export const APP_PROTOCOL_VERSION = 1;
  * refuses anything without a `protocol_version`, a `public_id`, a `kind` and a
  * `definition`.
  */
-export interface AppDocument {
+export interface PluginDocument {
   protocol_version: number;
   /** `<publisher>.<slug>`, the same id `definition.service.public_id` carries. */
   public_id: string;
@@ -66,12 +66,12 @@ export interface AppDocument {
  * The document to serve at {@link MANIFEST_PATH}. Serve the same bytes every
  * time: a deployment hashes what it fetches and re-checks it.
  */
-export function appDocument(
+export function pluginDocument(
   manifest: Manifest,
   options: { uid?: string; name?: string } = {}
-): AppDocument {
+): PluginDocument {
   return {
-    protocol_version: manifest.service?.protocol ?? APP_PROTOCOL_VERSION,
+    protocol_version: manifest.service?.protocol ?? PLUGIN_PROTOCOL_VERSION,
     public_id: manifest.service?.public_id ?? "",
     kind: "app",
     ...(options.uid ? { uid: options.uid } : {}),
@@ -90,13 +90,13 @@ export function validateDocument(document: unknown): ValidationProblem[] {
   if (typeof document !== "object" || document === null) {
     return [{ where: "", message: "a manifest document is a JSON object" }];
   }
-  const body = document as Partial<AppDocument>;
+  const body = document as Partial<PluginDocument>;
   const problems: ValidationProblem[] = [];
 
-  if (body.protocol_version !== APP_PROTOCOL_VERSION) {
+  if (body.protocol_version !== PLUGIN_PROTOCOL_VERSION) {
     problems.push({
       where: "/protocol_version",
-      message: `must be ${APP_PROTOCOL_VERSION} — a registrar refuses a protocol it does not speak`,
+      message: `must be ${PLUGIN_PROTOCOL_VERSION} — a registrar refuses a protocol it does not speak`,
     });
   }
   if (typeof body.public_id !== "string" || !body.public_id.trim()) {
@@ -148,14 +148,14 @@ const FEATURE_BLOCKS = Object.fromEntries(
 export function manifestSchema(): Record<string, unknown> {
   const here = dirname(fileURLToPath(import.meta.url));
   // Resolved relative to the built module so it works from `dist/` and `src/`.
-  for (const candidate of ["../schemas/app-manifest.json", "../../schemas/app-manifest.json"]) {
+  for (const candidate of ["../schemas/plugin-manifest.json", "../../schemas/plugin-manifest.json"]) {
     try {
       return JSON.parse(readFileSync(join(here, candidate), "utf-8"));
     } catch {
       continue;
     }
   }
-  throw new Error("app-manifest.json is not packaged beside this module");
+  throw new Error("plugin-manifest.json is not packaged beside this module");
 }
 
 export interface ValidationProblem {

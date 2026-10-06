@@ -1,5 +1,5 @@
 /**
- * `initiative-app init`: an example copied into a new directory, with a uid of
+ * `initiative-plugin init`: an example copied into a new directory, with a uid of
  * its own and its package named after the directory.
  */
 
@@ -41,7 +41,7 @@ describe("init", () => {
     const uid = uidOf(join(dir, "src", "app.ts"));
     expect(uid).not.toBe(uidOf(join(example, "src", "app.ts")));
     expect([...uid].every((char) => CHARSETS.uid.includes(char))).toBe(true);
-    expect(JSON.parse(readFileSync(join(dir, "package.json"), "utf-8")).name).toBe("my-app");
+    expect(JSON.parse(readFileSync(join(dir, "package.json"), "utf-8")).name).toBe("my-plugin");
     expect(readFileSync(join(dir, "src", "app.ts"), "utf-8").replace(uid, "")).toBe(
       readFileSync(join(example, "src", "app.ts"), "utf-8").replace(uidOf(join(example, "src", "app.ts")), "")
     );

@@ -1,4 +1,4 @@
-# initiative-app-sdk
+# initiative-plugin-sdk
 
 Build an app for [Initiative](https://github.com/Morelitea/initiative): a
 service that reads and writes a community's content, answers Initiative's
@@ -10,19 +10,19 @@ holds its tokens, and builds its manifest.
 
 | Import | Holds |
 |---|---|
-| `initiative-app-sdk/manifest` | `defineApp`, `defineEndpoint`, the contract's types, `validateManifest` |
-| `initiative-app-sdk/server` | `createApp`, `serve`, `EndpointError` |
-| `initiative-app-sdk/client` | `Initiative` and the `Client` it gives, acting as the community or a member; app keys |
-| `initiative-app-sdk/widget` | What a widget is handed, and the scenes it returns |
-| `initiative-app-sdk/testing` | A declarative app's requests and maps, run against recorded vendor answers |
-| bin `initiative-app` | `init`, `build`, `pack`, `dev`, `validate`, `keygen`, `uid`, `schema` |
+| `initiative-plugin-sdk/manifest` | `definePlugin`, `defineEndpoint`, the contract's types, `validateManifest` |
+| `initiative-plugin-sdk/server` | `createPlugin`, `serve`, `EndpointError` |
+| `initiative-plugin-sdk/client` | `Initiative` and the `Client` it gives, acting as the community or a member; app keys |
+| `initiative-plugin-sdk/widget` | What a widget is handed, and the scenes it returns |
+| `initiative-plugin-sdk/testing` | A declarative app's requests and maps, run against recorded vendor answers |
+| bin `initiative-plugin` | `init`, `build`, `pack`, `dev`, `validate`, `keygen`, `uid`, `schema` |
 
 Node 20 or later. Two runtime dependencies, `ajv` and `jsonata`; everything
-cryptographic uses `node:crypto`. `initiative-app build` bundles widgets with
+cryptographic uses `node:crypto`. `initiative-plugin build` bundles widgets with
 [esbuild](https://esbuild.github.io/), which you install beside the SDK:
 
 ```sh
-npm install initiative-app-sdk
+npm install initiative-plugin-sdk
 npm install --save-dev esbuild
 ```
 
@@ -30,7 +30,7 @@ npm install --save-dev esbuild
 
 ```ts
 // src/app.ts
-import { defineApp, defineEndpoint } from "initiative-app-sdk/manifest";
+import { definePlugin, defineEndpoint } from "initiative-plugin-sdk/manifest";
 
 export const openTickets = defineEndpoint({
   direction: "read",
@@ -46,9 +46,9 @@ export const openTickets = defineEndpoint({
   },
 });
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
-  uid: "K7M2QX8N4TVB9C", // npx initiative-app uid, once
+  uid: "K7M2QX8N4TVB9C", // npx initiative-plugin uid, once
   name: "Acme Tracker",
   scopes: ["projects:read", "comments:write"],
   endpoints: { "open-tickets": openTickets },
@@ -94,7 +94,7 @@ export default defineApp({
 | `initiative` | The initiative the call is confined to, or null. |
 | `connections` | Connection id → the handle Initiative gives a vendor token for. |
 | `client` | Initiative, already acting as `actor` and narrowed to `initiative`. |
-| `context` | What you gave `createApp` (below). |
+| `context` | What you gave `createPlugin` (below). |
 
 A handler answers `{ result }`, and `actor` too when the call ran on another
 credential than the call's own (a read that always uses the community's
@@ -146,7 +146,7 @@ the vendor answers into those fields. One kind exists, `github_app_manifest`
 ```ts
 vendor: {
   fields: [
-    { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+    { key: "plugin_id", type: "string", required: true, label: { en: "App id" } },
     { key: "private_key", type: "secret", required: true, label: { en: "Private key" } },
     // …
   ],
@@ -158,7 +158,7 @@ vendor: {
       default_permissions: { issues: "write", metadata: "read" },
       default_events: ["issues"],
     },
-    values: { app_id: "id", private_key: "pem" /* , … */ },
+    values: { plugin_id: "id", private_key: "pem" /* , … */ },
   },
 },
 ```
@@ -202,7 +202,7 @@ A widget is a module exporting `render`, typed from the endpoint it draws:
 
 ```ts
 // src/widgets/open-count.ts
-import type { Scene, WidgetData } from "initiative-app-sdk/widget";
+import type { Scene, WidgetData } from "initiative-plugin-sdk/widget";
 import type { openTickets } from "../app.js";
 
 export function render(data: WidgetData<typeof openTickets>): Scene {
@@ -221,8 +221,8 @@ contract's size cap. A widget imports nothing at run time.
 ## 3. Build
 
 ```sh
-npx initiative-app build              # writes manifest.json
-npx initiative-app build --check      # CI: fails if manifest.json is stale
+npx initiative-plugin build              # writes manifest.json
+npx initiative-plugin build --check      # CI: fails if manifest.json is stale
 ```
 
 `build` reads `src/app.ts` (`--app <file>` for another), bundles the widgets,
@@ -235,12 +235,12 @@ no longer matches the definition.
 ```ts
 // src/main.ts
 import app from "./app.js";
-import { createApp, serve } from "initiative-app-sdk/server";
+import { createPlugin, serve } from "initiative-plugin-sdk/server";
 
-serve(createApp(app));
+serve(createPlugin(app));
 ```
 
-`createApp(app, options)` returns a web-standard `(Request) => Promise<Response>`
+`createPlugin(app, options)` returns a web-standard `(Request) => Promise<Response>`
 handler, so the same app runs on any runtime, or behind any framework, that
 speaks `Request` and `Response`. `serve` runs it on `node:http`, on `PORT`
 (default 8080).
@@ -249,7 +249,7 @@ speaks `Request` and `Response`. `serve` runs it on `node:http`, on `PORT`
 |---|---|
 | `GET /healthz`, `GET /readyz` | Answer once the process is up. |
 | `GET /.well-known/jwks.json` | The app's public key. |
-| `GET /.well-known/initiative-app.json` | The manifest document: the manifest with the app's id, uid and name. |
+| `GET /.well-known/initiative-plugin.json` | The manifest document: the manifest with the app's id, uid and name. |
 | `GET, POST /v1/endpoints` | What the app declares; Initiative's endpoint calls, on a context token. |
 | `POST /v1/hooks/{name}` | Initiative's hook calls, on a lifecycle token for that hook. |
 | a surface's path | The surface's handler. |
@@ -263,8 +263,8 @@ refusal answers `{ "error": code, "detail": sentence }`.
 | Option | Default | |
 |---|---|---|
 | `baseUrl` | `INITIATIVE_BASE_URL` | Initiative's API as the app reaches it, such as `http://initiative:8173/api/v1`. |
-| `key` | `INITIATIVE_APP_PRIVATE_KEY`, `INITIATIVE_APP_KEY_ID` | The app's key: PEM, PEM with literal `\n`, or base64 of the PEM, and the `kid` it is registered under (default: its RFC 7638 thumbprint). |
-| `dataDir` | `INITIATIVE_APP_DATA_DIR`, else `data` | With no key given, one is generated on first start and kept here as `app-key.pem`. |
+| `key` | `INITIATIVE_PLUGIN_PRIVATE_KEY`, `INITIATIVE_PLUGIN_KEY_ID` | The app's key: PEM, PEM with literal `\n`, or base64 of the PEM, and the `kid` it is registered under (default: its RFC 7638 thumbprint). |
+| `dataDir` | `INITIATIVE_PLUGIN_DATA_DIR`, else `data` | With no key given, one is generated on first start and kept here as `plugin-key.pem`. |
 | `manifest` | `manifest.json` | The built manifest. |
 | `context` | | Handed to every handler as `context`. |
 | `fetch`, `now`, `log`, `env` | | For tests and other runtimes. |
@@ -272,7 +272,7 @@ refusal answers `{ "error": code, "detail": sentence }`.
 **The app's key.** With no key given, the app generates an ES256 key the first
 time it starts, keeps it, and serves its public half at
 `/.well-known/jwks.json`. The deployment running it registers that JWKS with
-Initiative, beside where the app runs, in its `APP_SERVICES_CONFIG` entry or
+Initiative, beside where the app runs, in its `PLUGIN_SERVICES_CONFIG` entry or
 under **Settings → Platform → Integrations → App services**. At every start
 the app logs each key it serves:
 
@@ -282,11 +282,11 @@ app key fingerprint: <thumbprint> (kid <kid>)
 
 The fingerprint is the key's RFC 7638 SHA-256 thumbprint, base64url without
 padding, the value Initiative shows when the operator connects the app, so the
-two can be compared. `jwkThumbprint` from `initiative-app-sdk/client` computes
+two can be compared. `jwkThumbprint` from `initiative-plugin-sdk/client` computes
 it for a JWKS entry. To bring your own key:
 
 ```sh
-npx initiative-app keygen --alg ES256 --out ./secrets
+npx initiative-plugin keygen --alg ES256 --out ./secrets
 ```
 
 `private-key.pem` (mode 0600) stays with the app; `jwks.json` is its public
@@ -297,13 +297,13 @@ one, then drop the old entry.
 once:
 
 ```ts
-declare module "initiative-app-sdk/manifest" {
-  interface AppContext {
+declare module "initiative-plugin-sdk/manifest" {
+  interface PluginContext {
     tracker: TrackerClient;
   }
 }
 
-serve(createApp(app, { context: { tracker: new TrackerClient() } }));
+serve(createPlugin(app, { context: { tracker: new TrackerClient() } }));
 ```
 
 ## 5. Call Initiative
@@ -311,12 +311,12 @@ serve(createApp(app, { context: { tracker: new TrackerClient() } }));
 A handler's `client` already acts for its call. Outside a call, make one:
 
 ```ts
-import { Initiative, loadPrivateKey } from "initiative-app-sdk/client";
+import { Initiative, loadPrivateKey } from "initiative-plugin-sdk/client";
 
 const initiative = new Initiative({
   baseUrl: "https://initiative.example.com/api/v1",
   publicId: "acme.tracker",
-  key: loadPrivateKey(pem, "app-1"),
+  key: loadPrivateKey(pem, "plugin-1"),
 });
 
 for (const { installation, active } of await initiative.installations()) {
@@ -349,10 +349,10 @@ for (const { installation, active } of await initiative.installations()) {
   route, the method changes with it in the SDK release built from that
   Initiative release, without a major version. The rest of the SDK follows
   semantic versioning.
-  `AppApiSchemas["TaskRead"]` names a schema's type.
+  `PluginApiSchemas["TaskRead"]` names a schema's type.
 - `client.request(method, path, { scope, body })` calls a community route (the
   path after `/c/{community}`) by hand, with the same scope check.
-- `client.callApp(publicId, endpointId, params)` calls another app's public
+- `client.callPlugin(publicId, endpointId, params)` calls another app's public
   endpoint through Initiative. It needs `apps:<publicId>` among the app's
   scopes, granted by the community.
 - The installation itself, on any installation token: `client.config()`,
@@ -404,7 +404,7 @@ service answers on the Compose network, an http or https URL of at most 512
 characters; Initiative pre-fills the deployment's base URL with it.
 
 ```sh
-npx initiative-app build --registry ../registry/sources
+npx initiative-plugin build --registry ../registry/sources
 ```
 
 writes the app's registry source under `<publisher>/<uid>/`: `listing.json`,
@@ -414,7 +414,7 @@ package runs ahead of its listing, and a new version is listed at its release,
 with its image's digest. The registry's CI checks and signs what is merged.
 
 A self-hosted deployment can also publish an app that is in no registry, from
-its listing file: see [A private app](#a-private-app).
+its listing file: see [A private app](#a-private-plugin).
 
 ## Declarative integrations
 
@@ -426,7 +426,7 @@ image and nothing to run, and its listing registers it as `declarative`.
 
 ```ts
 // src/app.ts
-import { defineApp, defineEndpoint } from "initiative-app-sdk/manifest";
+import { definePlugin, defineEndpoint } from "initiative-plugin-sdk/manifest";
 
 export const openIssues = defineEndpoint({
   direction: "read",
@@ -443,7 +443,7 @@ export const openIssues = defineEndpoint({
   map: '{"titles": response.body.title[], "total": $count(response.body)}',
 });
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
   uid: "K7M2QX8N4TVB9C",
   name: "Acme Tracker",
@@ -470,7 +470,7 @@ export default defineApp({
 ```ts
 // test/open-issues.test.ts
 import { expect, it } from "vitest";
-import { runEndpoint } from "initiative-app-sdk/testing";
+import { runEndpoint } from "initiative-plugin-sdk/testing";
 import app from "../src/app.js";
 import issues from "./fixtures/issues.json" with { type: "json" };
 
@@ -503,7 +503,7 @@ it("lists a repository's open issues", async () => {
 - **Each evaluation is bounded** by the contract's `CAPS.expressionTimeMs`,
   `CAPS.expressionDepth` and `CAPS.expressionOutputBytes`; past one, or on an
   error, the call answers `unavailable: mapping-failed`. `evaluate` from
-  `initiative-app-sdk/testing` runs an expression within the same bounds.
+  `initiative-plugin-sdk/testing` runs an expression within the same bounds.
 - **Credentials never enter an expression.** Initiative adds the one the
   request's `connection` names, as `auth` says: `Authorization: Bearer
   <token>` unless `auth: { header, prefix }` says otherwise. Every address
@@ -550,12 +550,12 @@ deployment's shelf beside the registry's. Start one from the example, a
 declarative app with one read and one widget:
 
 ```sh
-npx initiative-app-sdk init my-app      # copies examples/minimal, with a uid of its own
-cd my-app && npm install && npm test
+npx initiative-plugin-sdk init my-plugin      # copies examples/minimal, with a uid of its own
+cd my-plugin && npm install && npm test
 ```
 
 ```sh
-npx initiative-app pack                 # writes <publicId>-<version>.json
+npx initiative-plugin pack                 # writes <publicId>-<version>.json
 ```
 
 `pack` builds the app as `build` does, checks it the same way, and writes its
@@ -570,7 +570,7 @@ owner's session or personal API key. A container app packs too, and is live
 once its service is registered on the deployment.
 
 ```sh
-npx initiative-app dev --initiative https://initiative.example.com --api-key ppk_…
+npx initiative-plugin dev --initiative https://initiative.example.com --api-key ppk_…
 ```
 
 `dev` packs a declarative app and uploads it, with its picture, to your
@@ -592,8 +592,8 @@ deployment's app services.
 ## Validating by hand
 
 ```sh
-npx initiative-app validate manifest.json   # a manifest, or a served manifest document
-npx initiative-app schema                   # the JSON Schema it checks against
+npx initiative-plugin validate manifest.json   # a manifest, or a served manifest document
+npx initiative-plugin schema                   # the JSON Schema it checks against
 ```
 
 `validateManifest` runs the bundled JSON Schema, then the checks a schema
@@ -605,19 +605,19 @@ without saying so). The deployment also enforces byte-size caps.
 ## The contract
 
 `manifest.contract.json` is the one hand-written statement of what a manifest
-may say. `schemas/app-manifest.json` and `src/contract.ts` (its types) are
+may say. `schemas/plugin-manifest.json` and `src/contract.ts` (its types) are
 generated from it with `npm run generate`; `npm run check:generated` fails when
 either is stale. Initiative vendors the contract from this repository's tags.
 
-`src/app-api.generated.ts`, behind `client.api`, is generated from Initiative's
+`src/plugin-api.generated.ts`, behind `client.api`, is generated from Initiative's
 app API description, read from Initiative itself and not stored here. Its
 header names the Initiative it came from. Regenerate it from a checkout, a
 release or a running deployment, with the same emitter as the contract's types:
 
 ```sh
-npm run generate:app-api -- --checkout ../initiative   # runs its export with uv
-npm run generate:app-api -- --release v0.75.0
-npm run generate:app-api -- --url https://initiative.example.com
+npm run generate:plugin-api -- --checkout ../initiative   # runs its export with uv
+npm run generate:plugin-api -- --release v0.75.0
+npm run generate:plugin-api -- --url https://initiative.example.com
 ```
 
 ## Scopes

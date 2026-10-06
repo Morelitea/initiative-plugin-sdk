@@ -15,7 +15,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "paths": { "initiative-app-sdk/*": ["./src/*.ts"] }
+    "paths": { "initiative-plugin-sdk/*": ["./src/*.ts"] }
   },
   "include": ["src", "test", "examples/*/src", "examples/*/test"]
 }

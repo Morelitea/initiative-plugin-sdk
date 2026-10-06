@@ -1,6 +1,6 @@
 /** A project's open issues, with the closed ones beneath. */
 
-import type { Scene, WidgetData } from "initiative-app-sdk/widget";
+import type { Scene, WidgetData } from "initiative-plugin-sdk/widget";
 
 import type { issueCounts } from "../app.js";
 

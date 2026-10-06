@@ -5,7 +5,7 @@
  * the answer itself.
  */
 
-import { defineApp, defineEndpoint } from "initiative-app-sdk/manifest";
+import { definePlugin, defineEndpoint } from "initiative-plugin-sdk/manifest";
 
 /** How many issues a GitLab project has open and closed. */
 export const issueCounts = defineEndpoint({
@@ -24,9 +24,9 @@ export const issueCounts = defineEndpoint({
   cache_ttl_seconds: 300,
 });
 
-export default defineApp({
+export default definePlugin({
   publicId: "example.gitlab-issues",
-  uid: "ZNV2THEZGPHXXG", // npx initiative-app uid, once
+  uid: "ZNV2THEZGPHXXG", // npx initiative-plugin uid, once
   name: "GitLab issues",
   hosts: ["gitlab.com"],
 

@@ -5,6 +5,6 @@ import { defineConfig } from "vitest/config";
 // repository that name is the source.
 export default defineConfig({
   resolve: {
-    alias: [{ find: /^initiative-app-sdk\/(.*)$/, replacement: fileURLToPath(new URL("./src/$1.ts", import.meta.url)) }],
+    alias: [{ find: /^initiative-plugin-sdk\/(.*)$/, replacement: fileURLToPath(new URL("./src/$1.ts", import.meta.url)) }],
   },
 });

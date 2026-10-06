@@ -1,18 +1,18 @@
 /**
- * `initiative-app-sdk/manifest`: the contract as types, the app's one
+ * `initiative-plugin-sdk/manifest`: the contract as types, the app's one
  * definition, and checking a manifest before a deployment does.
  */
 
 export * from "./contract.js";
 
 export {
-  defineApp,
+  definePlugin,
   defineEndpoint,
   type Actor,
   type AfterConnectAnswer,
   type AfterConnectCall,
-  type AppContext,
-  type AppDefinition,
+  type PluginContext,
+  type PluginDefinition,
   type Call,
   type CallableEndpoint,
   type DashboardDeclaration,
@@ -42,7 +42,7 @@ export {
   manifestSchema,
   validateDocument,
   validateManifest,
-  type AppDocument,
+  type PluginDocument,
   type ValidationProblem,
 } from "./validate.js";
 

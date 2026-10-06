@@ -6,12 +6,12 @@
  * |---|---|
  * | `GET /healthz`, `GET /readyz` | the container runtime |
  * | `GET /.well-known/jwks.json` | a deployment that registers the app's key by address |
- * | `GET /.well-known/initiative-app.json` | a deployment reading the app's manifest document |
+ * | `GET /.well-known/initiative-plugin.json` | a deployment reading the app's manifest document |
  * | `GET, POST /v1/endpoints` | Initiative, with a context token |
  * | `POST /v1/hooks/{name}` | Initiative, with a lifecycle token |
  * | a surface's path | a member's browser, inside Initiative's frame |
  *
- * {@link createApp} returns a web-standard handler, `(Request) => Promise<Response>`,
+ * {@link createPlugin} returns a web-standard handler, `(Request) => Promise<Response>`,
  * so the same app runs on any runtime that speaks `Request` and `Response`.
  * {@link serve} runs it on `node:http`.
  */
@@ -25,8 +25,8 @@ import type { ActorKind, Manifest } from "./contract.js";
 import {
   endpointId,
   manifestOf,
-  type AnyApp,
-  type AppContext,
+  type AnyPlugin,
+  type PluginContext,
   type Call,
   type EndpointDeclaration,
   type Handoff,
@@ -34,7 +34,7 @@ import {
   type SurfaceDeclaration,
 } from "./define.js";
 import { Initiative } from "./client.js";
-import { generateAppKeys, jwkThumbprint, loadPrivateKey, publicJwks, type AppSigningKey } from "./keys.js";
+import { generatePluginKeys, jwkThumbprint, loadPrivateKey, publicJwks, type PluginSigningKey } from "./keys.js";
 import {
   ContextTokenError,
   JwksCache,
@@ -43,13 +43,13 @@ import {
   verifyLifecycleToken,
   type VerifyOptions,
 } from "./tokens.js";
-import { appDocument, MANIFEST_PATH } from "./validate.js";
+import { pluginDocument, MANIFEST_PATH } from "./validate.js";
 
 export type {
   Actor,
   AfterConnectAnswer,
   AfterConnectCall,
-  AppContext,
+  PluginContext,
   Call,
   EndpointCall,
   Handoff,
@@ -88,17 +88,17 @@ export interface Logger {
   error(message: string, error?: unknown): void;
 }
 
-export type AppOptions = {
+export type PluginOptions = {
   /** Initiative's API base as the app reaches it. Default: `INITIATIVE_BASE_URL`. */
   baseUrl?: string;
   /**
    * The app's key: a PEM, a PEM with literal `\n`, or base64 of the PEM, and
    * the `kid` it is registered under (default: its thumbprint). Default:
-   * `INITIATIVE_APP_PRIVATE_KEY` and `INITIATIVE_APP_KEY_ID`, else a key
+   * `INITIATIVE_PLUGIN_PRIVATE_KEY` and `INITIATIVE_PLUGIN_KEY_ID`, else a key
    * generated on first start and kept in `dataDir`.
    */
   key?: { privateKey: string; kid?: string };
-  /** Where a generated key is kept. Default: `INITIATIVE_APP_DATA_DIR`, else `data`. */
+  /** Where a generated key is kept. Default: `INITIATIVE_PLUGIN_DATA_DIR`, else `data`. */
   dataDir?: string;
   /** The built manifest. Default: `manifest.json` in the working directory. */
   manifest?: Manifest;
@@ -108,9 +108,9 @@ export type AppOptions = {
   /** Milliseconds since the epoch. */
   now?: () => number;
   log?: Logger;
-} & ({} extends AppContext ? { context?: AppContext } : { context: AppContext });
+} & ({} extends PluginContext ? { context?: PluginContext } : { context: PluginContext });
 
-export type AppHandler = (request: Request) => Promise<Response>;
+export type PluginHandler = (request: Request) => Promise<Response>;
 
 const consoleLogger: Logger = {
   info: (message) => console.log(message),
@@ -121,10 +121,10 @@ const consoleLogger: Logger = {
 class TooLarge extends Error {}
 
 /** The app's server, as a web-standard handler. */
-export function createApp(
-  app: AnyApp,
-  ...[options = {} as AppOptions]: {} extends AppContext ? [AppOptions?] : [AppOptions]
-): AppHandler {
+export function createPlugin(
+  app: AnyPlugin,
+  ...[options = {} as PluginOptions]: {} extends PluginContext ? [PluginOptions?] : [PluginOptions]
+): PluginHandler {
   if (app.hosts) throw new TypeError("a declarative app has no service to run: Initiative answers it from its manifest");
   const env = options.env ?? process.env;
   const baseUrl = options.baseUrl ?? env.INITIATIVE_BASE_URL;
@@ -132,10 +132,10 @@ export function createApp(
   const log = options.log ?? consoleLogger;
   const fetchImpl = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
-  const context = (options.context ?? {}) as AppContext;
-  const key = appKey(options, env);
+  const context = (options.context ?? {}) as PluginContext;
+  const key = pluginKey(options, env);
   const manifest = builtManifest(app, options.manifest);
-  const document = JSON.stringify(appDocument(manifest, { uid: app.uid, name: app.name }));
+  const document = JSON.stringify(pluginDocument(manifest, { uid: app.uid, name: app.name }));
   const served = publicJwks(key);
   for (const jwk of served.keys) log.info(`app key fingerprint: ${jwkThumbprint(jwk)} (kid ${jwk.kid})`);
   const jwks = JSON.stringify(served);
@@ -333,7 +333,7 @@ export function createApp(
  * The app's handler on `node:http`, listening on `port` (default: `PORT`, else
  * 8080). Close the returned server to stop.
  */
-export function serve(handler: AppHandler, options: { port?: number; hostname?: string } = {}): Server {
+export function serve(handler: PluginHandler, options: { port?: number; hostname?: string } = {}): Server {
   const server = createServer(async (req, res) => {
     try {
       const method = req.method ?? "GET";
@@ -367,14 +367,14 @@ function headersOf(incoming: IncomingHttpHeaders): Headers {
 }
 
 /** The app's key: given, from the environment, or generated once and kept. */
-function appKey(options: AppOptions, env: Record<string, string | undefined>): AppSigningKey {
-  const given = options.key?.privateKey ?? env.INITIATIVE_APP_PRIVATE_KEY;
-  if (given) return loadPrivateKey(pemText(given), options.key?.kid ?? env.INITIATIVE_APP_KEY_ID);
-  const dir = options.dataDir ?? env.INITIATIVE_APP_DATA_DIR ?? "data";
-  const path = join(dir, "app-key.pem");
+function pluginKey(options: PluginOptions, env: Record<string, string | undefined>): PluginSigningKey {
+  const given = options.key?.privateKey ?? env.INITIATIVE_PLUGIN_PRIVATE_KEY;
+  if (given) return loadPrivateKey(pemText(given), options.key?.kid ?? env.INITIATIVE_PLUGIN_KEY_ID);
+  const dir = options.dataDir ?? env.INITIATIVE_PLUGIN_DATA_DIR ?? "data";
+  const path = join(dir, "plugin-key.pem");
   if (!existsSync(path)) {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(path, generateAppKeys({ alg: "ES256" }).privateKeyPem, { mode: 0o600, flag: "wx" });
+    writeFileSync(path, generatePluginKeys({ alg: "ES256" }).privateKeyPem, { mode: 0o600, flag: "wx" });
   }
   return loadPrivateKey(readFileSync(path, "utf-8"));
 }
@@ -385,19 +385,19 @@ function pemText(raw: string): string {
 }
 
 /**
- * The manifest the app serves: what `initiative-app build` wrote, held to the
+ * The manifest the app serves: what `initiative-plugin build` wrote, held to the
  * definition so a stale build is refused at start.
  */
-function builtManifest(app: AnyApp, given: Manifest | undefined): Manifest {
+function builtManifest(app: AnyPlugin, given: Manifest | undefined): Manifest {
   const path = "manifest.json";
   const built: Manifest | undefined = given ?? (existsSync(path) ? JSON.parse(readFileSync(path, "utf-8")) : undefined);
   if (!built) {
-    if (Object.keys(app.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-app build");
+    if (Object.keys(app.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-plugin build");
     return manifestOf(app);
   }
   const modules = Object.fromEntries((built.widgets ?? []).map((widget) => [widget.id, widget.module_source]));
   if (JSON.stringify(manifestOf(app, modules)) !== JSON.stringify(built)) {
-    throw new Error("manifest.json does not match the app's definition: run initiative-app build");
+    throw new Error("manifest.json does not match the app's definition: run initiative-plugin build");
   }
   return built;
 }

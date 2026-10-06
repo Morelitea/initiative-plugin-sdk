@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://initiative.morels.me/schemas/app-manifest-v1.json",
+  "$id": "https://initiative.morels.me/schemas/plugin-manifest-v1.json",
   "title": "Initiative app manifest (the 'definition' body)",
-  "description": "What an app declares it can do. An app is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks and webhook events Initiative runs itself from the requests and JSONata expressions written here; one app is never both. This is the 'definition' field of the document served at /.well-known/initiative-app.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, and the bounds and unique ids of schedules are enforced by the platform on publish and are not expressible here.",
+  "description": "What an app declares it can do. An app is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks and webhook events Initiative runs itself from the requests and JSONata expressions written here; one app is never both. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, and the bounds and unique ids of schedules are enforced by the platform on publish and are not expressible here.",
   "type": "object",
   "required": [
-    "app_kind",
+    "plugin_kind",
     "features"
   ],
   "properties": {
-    "app_kind": {
+    "plugin_kind": {
       "const": "service",
       "description": "The kind every app manifest has, container or declarative: a declarative app is one with no 'service' block."
     },
@@ -72,7 +72,7 @@
                 ]
               },
               {
-                "$ref": "#/$defs/appScope"
+                "$ref": "#/$defs/pluginScope"
               }
             ]
           },
@@ -739,7 +739,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 300,
-          "description": "The JWT's issuer, normally '{vendor.app_id}'. May name a vendor value as '{vendor.<key>}' and one of this connection's own fields as '{<key>}'."
+          "description": "The JWT's issuer, normally '{vendor.plugin_id}'. May name a vendor value as '{vendor.<key>}' and one of this connection's own fields as '{<key>}'."
         },
         "key": {
           "type": "string",
@@ -765,7 +765,7 @@
     },
     "webhooks": {
       "type": "object",
-      "description": "The vendor's webhooks, received by Initiative at one address per app on the deployment, '/api/v1/app-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the app's webhook hook once for each. A container app's hook receives each delivery; a declarative app maps it with 'events' and 'status' instead.",
+      "description": "The vendor's webhooks, received by Initiative at one address per app on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the app's webhook hook once for each. A container app's hook receives each delivery; a declarative app maps it with 'events' and 'status' instead.",
       "required": [
         "verify",
         "dedup",
@@ -906,7 +906,7 @@
       "pattern": "^[\\-.0123456789_abcdefghijklmnopqrstuvwxyz]+$",
       "description": "Namespaced under the app's own service id — 'app.<public_id>.<name>'. The prefix is checked against the declaring registration at ingress."
     },
-    "appScope": {
+    "pluginScope": {
       "type": "string",
       "pattern": "^apps:[\\-.0123456789_abcdefghijklmnopqrstuvwxyz]*\\.[\\-.0123456789_abcdefghijklmnopqrstuvwxyz]*$",
       "description": "'apps:<public_id>': permission to call another app's public endpoints through the deployment, as this community or as one of its members. Not one of the fixed scopes: the family is open, one per app, and the public id after the prefix is the app being called. The deployment never lets an app address another directly; the call goes through it, and the app called is handed its own references for whoever the call is for."

@@ -1,5 +1,5 @@
 /**
- * `initiative-app build`: the manifest with each widget bundled into it, and
+ * `initiative-plugin build`: the manifest with each widget bundled into it, and
  * the registry source while the listing names the package's version, or a
  * check that the committed files are what the definition produces. `pack`,
  * the listing file a deployment publishes as its own app, and `dev`, which
@@ -30,7 +30,7 @@ let output: string[];
 
 function app(extra = "", listing = ""): string {
   return `
-import { defineApp, defineEndpoint } from ${JSON.stringify(sdk)};
+import { definePlugin, defineEndpoint } from ${JSON.stringify(sdk)};
 
 export const count = defineEndpoint({
   direction: "read",
@@ -38,7 +38,7 @@ export const count = defineEndpoint({
   handler: async () => ({ result: { total: 1 } }),
 });
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
   uid: "K7M2QX8N4TVB9C",
   name: "Tracker",
@@ -61,9 +61,9 @@ export default defineApp({
 /** A declarative app: one read Initiative makes and maps itself. */
 function declarative(map: string, extra = ""): string {
   return `
-import { defineApp, defineEndpoint } from ${JSON.stringify(sdk)};
+import { definePlugin, defineEndpoint } from ${JSON.stringify(sdk)};
 
-export default defineApp({
+export default definePlugin({
   publicId: "acme.tracker",
   uid: "K7M2QX8N4TVB9C",
   name: "Tracker",

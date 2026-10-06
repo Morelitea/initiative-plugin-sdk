@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { runEndpoint } from "initiative-app-sdk/testing";
+import { runEndpoint } from "initiative-plugin-sdk/testing";
 
 import app from "../src/app.js";
 import { render } from "../src/widgets/open-issues.js";

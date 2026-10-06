@@ -1,6 +1,6 @@
 /**
  * JSON Schema as TypeScript, shared by the generators: the manifest contract's
- * types (`generate.mjs`) and the app API's (`generate-app-api.mjs`).
+ * types (`generate.mjs`) and the app API's (`generate-plugin-api.mjs`).
  *
  * Each caller says what its own schemas name and how its prose reads:
  *
