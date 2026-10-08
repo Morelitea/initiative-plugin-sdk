@@ -2,7 +2,7 @@
  * One typed definition of a plug-in.
  *
  * {@link definePlugin} takes everything a plug-in declares and does: its endpoints
- * with their handlers, its hooks and schedules, its widgets and surfaces, and
+ * with their handlers, its hooks and schedules, its widgets and pages, and
  * its listing. The same object routes Initiative's calls (`createPlugin`) and
  * becomes the manifest (`initiative-plugin build`), so nothing is stated twice.
  *
@@ -27,7 +27,7 @@ import type {
   BundledDashboard,
   BundledDashboardWidget,
   Connection,
-  Embed,
+  Page,
   Endpoint,
   EndpointParam,
   EndpointReturn,
@@ -230,18 +230,18 @@ export interface ScheduleDeclaration {
   run: (call: ScheduleCall) => Promise<void>;
 }
 
-/** A member opening one of the plug-in's surfaces, as the handoff token names them. */
+/** A member opening one of the plug-in's pages, as the handoff token names them. */
 export interface Handoff extends Call {
-  surface: string;
+  page: string;
   /** The member, by this installation's reference for them. */
   viewer: string;
   /** Whether the viewer administers the community. For shaping screens; not a grant. */
   admin: boolean;
-  /** The initiative the surface was opened in, or null for the whole community. */
+  /** The initiative the page was opened in, or null for the whole community. */
   initiative: number | null;
 }
 
-export interface SurfaceCall {
+export interface PageCall {
   request: Request;
   /** Null for a request that carries no handoff token, such as the page's own files. */
   handoff: Handoff | null;
@@ -252,8 +252,8 @@ export interface SurfaceCall {
  * request under its path that carries a handoff token reaches the handler with
  * the handoff verified.
  */
-export interface SurfaceDeclaration extends Omit<Embed, "id"> {
-  handler?: (call: SurfaceCall) => Promise<Response>;
+export interface PageDeclaration extends Omit<Page, "id"> {
+  handler?: (call: PageCall) => Promise<Response>;
 }
 
 type ReadName<E> = {
@@ -365,8 +365,8 @@ export interface PluginDefinition<E, W> {
   communitySummary?: ReadName<E>;
   hooks?: Hooks;
   widgets?: W;
-  /** Pages and panels, keyed by surface id. */
-  surfaces?: Record<string, SurfaceDeclaration>;
+  /** Pages and panels, keyed by page id. */
+  pages?: Record<string, PageDeclaration>;
   dashboards?: DashboardDeclaration<E, W>[];
   listing?: ListingDeclaration;
 }
@@ -409,9 +409,9 @@ export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = 
     endpoints: listOf(plugin.endpoints, (key, endpoint) => endpointOf(id(key), endpoint, id)),
     community_summary: plugin.communitySummary === undefined ? undefined : id(plugin.communitySummary),
     widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, modules[key] ?? "", id)),
-    embeds: listOf(plugin.surfaces, (key, surface) => {
-      const { handler: _handler, ...embed } = surface;
-      return { id: key, ...embed };
+    pages: listOf(plugin.pages, (key, page) => {
+      const { handler: _handler, ...declared } = page;
+      return { id: key, ...declared };
     }),
     dashboards: plugin.dashboards?.map((dashboard) => ({
       ...dashboard,

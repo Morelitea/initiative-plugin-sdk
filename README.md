@@ -78,7 +78,7 @@ export default definePlugin({
   uses the key.
 - **Everything else is the contract's own shape**, from
   [`manifest.contract.json`](manifest.contract.json): `vendor`, `connections`
-  (keyed by id), `webhooks`, `surfaces` (the contract's embeds, keyed by id),
+  (keyed by id), `webhooks`, `pages` (keyed by id),
   `dashboards`. The types are generated from the contract, so every term the
   contract declares has a type here.
 - **Features follow from what is filled in.** A plug-in with widgets declares
@@ -173,12 +173,12 @@ vendor: {
   key must be a vendor field, each answer is written at most once, and
   `client_secret`, `pem` and `webhook_secret` go to `secret` fields.
 
-### Surfaces
+### Pages
 
-A surface is one of your plug-in's pages, framed by Initiative:
+A page is one of your plug-in's screens, framed by Initiative:
 
 ```ts
-surfaces: {
+pages: {
   board: {
     path: "/board",
     name: { en: "Board" },
@@ -192,8 +192,8 @@ surfaces: {
 ```
 
 Initiative hands the frame a one-use handoff token. Send it from the page to
-any path under the surface's as `Authorization: Bearer …`: the SDK verifies it
-(type, signature, audience, surface, and that it was not used before) and hands the
+any path under the page's as `Authorization: Bearer …`: the SDK verifies it
+(type, signature, audience, page, and that it was not used before) and hands the
 handler `viewer`, `admin`, `initiative` and a `client` acting as the
 installation, narrowed to that initiative.
 
@@ -276,7 +276,7 @@ speaks `Request` and `Response`. `serve` runs it on `node:http`, on `PORT`
 | `GET /.well-known/initiative-plugin.json` | The manifest document: the manifest with the plug-in's id, uid and name. |
 | `GET, POST /v1/endpoints` | What the plug-in declares; Initiative's endpoint calls, on a context token. |
 | `POST /v1/hooks/{name}` | Initiative's hook calls, on a lifecycle token for that hook. |
-| a surface's path | The surface's handler. |
+| a page's path | The page's handler. |
 
 Every call's token is verified against the deployment's JWKS, which is cached
 and refetched once for a key it does not know. Each kind carries its own `typ`
@@ -578,7 +578,7 @@ it("lists a repository's open issues", async () => {
   connection's state; a delivery may be routed by a `header` instead of a
   body `path`.
 - **One plug-in is one kind.** A declarative plug-in has no handlers, hooks,
-  schedules or surfaces, and asks for no scopes; a container plug-in uses none of
+  schedules or pages, and asks for no scopes; a container plug-in uses none of
   these terms. `validateManifest` and `build` refuse a mix.
 
 `runEndpoint`, `runAfterConnect`, `runHealth` and `runWebhook` render each

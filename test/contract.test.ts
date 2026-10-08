@@ -21,7 +21,7 @@ import {
   CONNECTION_SCOPES,
   CONNECTION_STATES,
   DIRECTIONS,
-  EMBED_CAPABILITIES,
+  PAGE_CAPABILITIES,
   FEATURES,
   FIELDS,
   FIELD_TYPES,
@@ -85,11 +85,11 @@ describe("the schema draws its vocabulary from the contract", () => {
     ["directions", DIRECTIONS, schema.$defs.endpoint.properties.direction.enum],
     ["actor kinds", ACTOR_KINDS, schema.$defs.endpoint.properties.actors.items.enum],
     ["scopes", SCOPES, schema.properties.service.properties.scopes.items.anyOf[0].enum],
-    ["surface scopes", SURFACE_SCOPES, schema.$defs.embed.properties.scopes.items.enum],
+    ["surface scopes", SURFACE_SCOPES, schema.$defs.page.properties.scopes.items.enum],
     [
-      "embed capabilities",
-      EMBED_CAPABILITIES,
-      schema.$defs.embed.properties.capabilities.items.enum,
+      "page capabilities",
+      PAGE_CAPABILITIES,
+      schema.$defs.page.properties.capabilities.items.enum,
     ],
     ["http methods", HTTP_METHODS, schema.$defs.vendorRequest.properties.method.enum],
     ["page limits", PAGE_LIMITS, schema.$defs.pageNumberPaging.properties.on_limit.enum],
@@ -142,12 +142,12 @@ describe("the schema draws its vocabulary from the contract", () => {
     expect(contract.enums).not.toHaveProperty("visibility");
     expect(contract.enums).not.toHaveProperty("endpointVisibility");
     expect(contract.ladders).toEqual({});
-    expect(schema.$defs.embed.properties).not.toHaveProperty("visibility");
+    expect(schema.$defs.page.properties).not.toHaveProperty("visibility");
     expect(schema.$defs.endpoint.properties).not.toHaveProperty("visibility");
   });
 
-  it("a surface can be marked admin-only, defaulting to false", () => {
-    expect(schema.$defs.embed.properties.admin_only).toMatchObject({
+  it("a page can be marked admin-only, defaulting to false", () => {
+    expect(schema.$defs.page.properties.admin_only).toMatchObject({
       type: "boolean",
       default: false,
     });

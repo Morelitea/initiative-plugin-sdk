@@ -244,7 +244,7 @@ describe("verifyHandoffToken", () => {
     );
   });
 
-  it("returns the member, the surface and the initiative", async () => {
+  it("returns the member, the page and the initiative", async () => {
     const { fetchImpl } = jwksFetch();
     const verified = await verifyHandoffToken(signJwt(signing, handoffClaims(), HANDOFF_TOKEN_TYPE), options(fetchImpl));
     expect(verified).toMatchObject({
@@ -264,7 +264,7 @@ describe("verifyHandoffToken", () => {
     expect(verified.initiative_id).toBeUndefined();
   });
 
-  it("refuses a token naming no member or no surface", async () => {
+  it("refuses a token naming no member or no page", async () => {
     const { fetchImpl } = jwksFetch();
     expect(
       await refusal(
@@ -278,7 +278,7 @@ describe("verifyHandoffToken", () => {
           options(fetchImpl)
         )
       )
-    ).toContain("no surface");
+    ).toContain("no page");
   });
 
   it("checks the audience like a context token", async () => {

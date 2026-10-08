@@ -266,7 +266,7 @@ describe("hooks", () => {
   });
 });
 
-describe("surfaces", () => {
+describe("pages", () => {
   it("serves the page's own requests with no handoff", async () => {
     expect(await read(get("/board"))).toEqual({ viewer: null, initiative: null, admin: null });
   });
@@ -278,7 +278,7 @@ describe("surfaces", () => {
     expect((await get("/board/session", { Authorization: `Bearer ${token}` })).status).toBe(401);
   });
 
-  it("refuses a handoff for another surface, or one not signed by the deployment", async () => {
+  it("refuses a handoff for another page, or one not signed by the deployment", async () => {
     expect((await get("/board", { Authorization: `Bearer ${handoffToken({ surface_id: "settings" })}` })).status).toBe(401);
     const foreign = sign({ sub: "uapp_alice", surface_id: "board" }, stranger.privateKeyPem);
     expect((await get("/board", { Authorization: `Bearer ${foreign}` })).status).toBe(401);

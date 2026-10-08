@@ -24,6 +24,8 @@ export {
   type Hooks,
   type ListingDeclaration,
   type Outcome,
+  type PageCall,
+  type PageDeclaration,
   type Params,
   type ParamSpec,
   type ParamValue,
@@ -32,8 +34,6 @@ export {
   type RevokeCall,
   type ScheduleCall,
   type ScheduleDeclaration,
-  type SurfaceCall,
-  type SurfaceDeclaration,
   type WebhookCall,
   type WidgetDeclaration,
 } from "./define.js";
