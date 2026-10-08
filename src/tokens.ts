@@ -9,8 +9,8 @@
  *   `lifecycle` is a call to one hook, named by `hook`. When another plug-in made
  *   the call through Initiative it also carries `act` (that plug-in), `actor`,
  *   `member` and, when the caller was confined to one, `initiative_id`.
- * - **Handoff token**, when a member opens one of the plug-in's surfaces. It names
- *   the member (`sub`), the surface, and the initiative it was opened in. It is
+ * - **Handoff token**, when a member opens one of the plug-in's pages. It names
+ *   the member (`sub`), the page, and the initiative it was opened in. It is
  *   for one use.
  *
  * Each is checked the same way: the `kid` against the deployment's JWKS, the
@@ -101,7 +101,7 @@ export interface ContextClaims extends InitiativeTokenClaims {
 export interface HandoffClaims extends InitiativeTokenClaims {
   /** The member, by their reference for your installation. */
   sub: string;
-  /** Which of your surfaces was opened. */
+  /** Which of your pages was opened. */
   surface_id: string;
   /** The initiative it was opened in. Absent when opened for the whole community. */
   initiative_id?: number;
@@ -271,7 +271,7 @@ export async function verifyHandoffToken(
     throw new ContextTokenError("handoff token names no member");
   }
   if (typeof claims.surface_id !== "string" || !claims.surface_id) {
-    throw new ContextTokenError("handoff token names no surface");
+    throw new ContextTokenError("handoff token names no page");
   }
   return claims;
 }

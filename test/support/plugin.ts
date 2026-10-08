@@ -112,7 +112,7 @@ export function trackerPlugin() {
         sample_data: { "open-tickets": { total: 3 } },
       },
     },
-    surfaces: {
+    pages: {
       board: {
         path: "/board",
         name: { en: "Board" },

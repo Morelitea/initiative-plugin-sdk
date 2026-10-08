@@ -58,11 +58,11 @@ describe("the schema actually runs", () => {
   it("catches a path that is an address rather than a route", () => {
     const problems = validateManifest({
       ...base(),
-      features: ["embeds"],
-      embeds: [{ id: "e", path: "https://elsewhere.test/e", name: { en: "E" } }],
+      features: ["pages"],
+      pages: [{ id: "e", path: "https://elsewhere.test/e", name: { en: "E" } }],
     });
     expect(problems.length).toBeGreaterThan(0);
-    expect(problems[0].where).toContain("/embeds/0/path");
+    expect(problems[0].where).toContain("/pages/0/path");
   });
 
   it("catches an endpoint that could never run", () => {
@@ -90,11 +90,11 @@ describe("the schema actually runs", () => {
     expect(problems[0].where).toContain("/endpoints/0");
   });
 
-  it("catches a capability no surface may request", () => {
+  it("catches a capability no page may request", () => {
     const problems = validateManifest({
       ...base(),
-      features: ["embeds"],
-      embeds: [{ id: "e", path: "/e", name: { en: "E" }, capabilities: ["payment"] }],
+      features: ["pages"],
+      pages: [{ id: "e", path: "/e", name: { en: "E" }, capabilities: ["payment"] }],
     });
     expect(problems.length).toBeGreaterThan(0);
     expect(problems[0].where).toContain("capabilities");
@@ -925,39 +925,39 @@ describe("the scopes a plug-in asks for", () => {
   });
 });
 
-describe("an admin-only surface", () => {
-  const withEmbed = (embed: Record<string, unknown>) =>
+describe("an admin-only page", () => {
+  const withPage = (page: Record<string, unknown>) =>
     validateManifest({
       ...base(),
-      features: ["embeds"],
-      embeds: [{ id: "settings", path: "/settings", name: { en: "Settings" }, ...embed }],
+      features: ["pages"],
+      pages: [{ id: "settings", path: "/settings", name: { en: "Settings" }, ...page }],
     } as never);
 
   it("takes admin_only as a boolean", () => {
-    expect(messages(withEmbed({ admin_only: true }))).toBe("");
-    expect(messages(withEmbed({ admin_only: false }))).toBe("");
-    expect(messages(withEmbed({}))).toBe("");
+    expect(messages(withPage({ admin_only: true }))).toBe("");
+    expect(messages(withPage({ admin_only: false }))).toBe("");
+    expect(messages(withPage({}))).toBe("");
   });
 
   it("refuses anything else", () => {
-    const problems = withEmbed({ admin_only: "yes" });
+    const problems = withPage({ admin_only: "yes" });
     expect(problems.length).toBeGreaterThan(0);
-    expect(problems[0].where).toBe("/embeds/0/admin_only");
+    expect(problems[0].where).toBe("/pages/0/admin_only");
   });
 });
 
 describe("terms the contract does not declare", () => {
-  it("reports a surface's visibility, which placement roles replaced", () => {
+  it("reports a page's visibility, which placement roles replaced", () => {
     const problems = validateManifest({
       ...base(),
-      features: ["embeds"],
-      embeds: [
+      features: ["pages"],
+      pages: [
         { id: "panel", path: "/panel", name: { en: "Panel" }, visibility: "guild_admin" },
       ],
     } as never);
     expect(problems).toEqual([
       {
-        where: "/embeds/0/visibility",
+        where: "/pages/0/visibility",
         message: "'visibility' is not a term of the manifest contract, and a deployment discards it",
       },
     ]);

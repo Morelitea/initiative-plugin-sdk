@@ -142,7 +142,7 @@ const { doc, objectType, tsType } = emitter({
 });
 
 const screaming = (name) => name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
-/** 'embedCapability' -> 'EMBED_CAPABILITIES', so the constant beside a type reads as English. */
+/** 'pageCapability' -> 'PAGE_CAPABILITIES', so the constant beside a type reads as English. */
 const plural = (name) => (/[^aeiou]y$/.test(name) ? `${name.slice(0, -1)}ies` : `${name}s`);
 
 function buildTypes() {

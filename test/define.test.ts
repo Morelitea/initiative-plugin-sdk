@@ -20,7 +20,7 @@ describe("manifestOf", () => {
         {
           plugin_kind: "service",
           service: { public_id: "acme.tracker", protocol: 1, scopes: ["projects:read", "plugins:acme.github"] },
-          features: ["dashboards", "embeds", "endpoints", "widgets"],
+          features: ["dashboards", "endpoints", "pages", "widgets"],
           default_name: "Tracker",
           vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
           connections: [
@@ -97,7 +97,7 @@ describe("manifestOf", () => {
               sample_data: { "plugin.acme.tracker.open-tickets": { total: 3 } },
             },
           ],
-          embeds: [{ id: "board", path: "/board", name: { en: "Board" }, scopes: ["initiative"] }],
+          pages: [{ id: "board", path: "/board", name: { en: "Board" }, scopes: ["initiative"] }],
           dashboards: [
             {
               uid: "M3N4P5Q6R7S8T9",

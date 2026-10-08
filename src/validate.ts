@@ -627,8 +627,8 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
     });
   });
 
-  (body.embeds ?? []).forEach((embed, index) =>
-    checkRequires(embed.requires, `/embeds/${index}/requires`)
+  (body.pages ?? []).forEach((page, index) =>
+    checkRequires(page.requires, `/pages/${index}/requires`)
   );
   (body.widgets ?? []).forEach((widget, index) => {
     checkRequires(widget.requires, `/widgets/${index}/requires`);
@@ -861,7 +861,7 @@ const DECLARATIVE_TERMS = ["request", "steps", "map", "errors"] as const;
 /**
  * A plug-in is one kind or the other. A declarative plug-in — no `service` block —
  * names its hosts, and every read and write it offers is a request and a map:
- * there is no container for a handler, hook, schedule or surface to run in. A
+ * there is no container for a handler, hook, schedule or page to run in. A
  * container plug-in uses none of the declarative terms.
  */
 function kindProblems(body: Manifest): ValidationProblem[] {
@@ -873,7 +873,7 @@ function kindProblems(body: Manifest): ValidationProblem[] {
   if (body.service === undefined) {
     if (!body.hosts) push("/hosts", "a declarative plug-in (one with no service block) names the hosts it calls");
     if (body.schedules) push("/schedules", "a declarative plug-in has no schedules: they call a container's hook");
-    if (body.embeds) push("/embeds", "a declarative plug-in has no surfaces: a surface is a container's page");
+    if (body.pages) push("/pages", "a declarative plug-in has no pages: a page is served by a container");
     endpoints.forEach((endpoint, index) => {
       const where = `/endpoints/${index}`;
       if (endpoint.direction === "emit") {

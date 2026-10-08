@@ -9,8 +9,8 @@
  * cannot describe a manifest the schema refuses, nor miss a term it allows.
  */
 
-export type Feature = "dashboards" | "embeds" | "endpoints" | "widgets";
-export const FEATURES: readonly Feature[] = ["dashboards", "embeds", "endpoints", "widgets"];
+export type Feature = "dashboards" | "endpoints" | "pages" | "widgets";
+export const FEATURES: readonly Feature[] = ["dashboards", "endpoints", "pages", "widgets"];
 
 export type Protocol = 1;
 export const PROTOCOLS: readonly Protocol[] = [1];
@@ -66,8 +66,8 @@ export const SCOPES: readonly Scope[] = ["projects:read", "projects:write", "fil
 export type SurfaceScope = "community" | "initiative";
 export const SURFACE_SCOPES: readonly SurfaceScope[] = ["community", "initiative"];
 
-export type EmbedCapability = "camera" | "clipboard-read" | "clipboard-write" | "display-capture" | "fullscreen" | "geolocation" | "microphone";
-export const EMBED_CAPABILITIES: readonly EmbedCapability[] = ["camera", "clipboard-read", "clipboard-write", "display-capture", "fullscreen", "geolocation", "microphone"];
+export type PageCapability = "camera" | "clipboard-read" | "clipboard-write" | "display-capture" | "fullscreen" | "geolocation" | "microphone";
+export const PAGE_CAPABILITIES: readonly PageCapability[] = ["camera", "clipboard-read", "clipboard-write", "display-capture", "fullscreen", "geolocation", "microphone"];
 
 export type ListingKind = "plugin" | "dashboard";
 export const LISTING_KINDS: readonly ListingKind[] = ["plugin", "dashboard"];
@@ -105,8 +105,8 @@ export const CAPS = {
   endpoints: 64,
   paramsPerEndpoint: 12,
   returnsPerEndpoint: 24,
-  embeds: 12,
-  embedCapabilities: 8,
+  pages: 12,
+  pageCapabilities: 8,
   bundledDashboards: 8,
   dashboardWidgets: 50,
   dashboardGridColumns: 12,
@@ -143,7 +143,7 @@ export const CAPS = {
   hosts: 8,
   hostLength: 253,
   steps: 3,
-  pages: 10,
+  maxPages: 10,
   perPage: 100,
   requestQuery: 24,
   requestHeaders: 12,
@@ -202,7 +202,7 @@ export const FIELDS = {
   schedule: ["id", "every"],
   endpoint: ["id", "label", "description", "returns", "group", "needs_subject", "direction", "params", "actors", "admin_only", "public", "requires", "cache_ttl_seconds", "identity", "unavailable", "request", "steps", "map", "errors"],
   widget: ["id", "meta", "module_source", "endpoints", "sample_data", "requires"],
-  embed: ["id", "path", "name", "scopes", "admin_only", "capabilities", "requires"],
+  page: ["id", "path", "name", "scopes", "admin_only", "capabilities", "requires"],
   bundledDashboard: ["uid", "public_id", "name", "description", "layout", "widgets"],
   bundledDashboardWidget: ["id", "type", "title", "grid", "binding"],
   endpointIdentity: ["kind", "key"],
@@ -219,7 +219,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "embeds", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "pages", "dashboards"],
 } as const;
 
 export type Identifier = string;
@@ -845,26 +845,26 @@ export interface Widget {
   requires?: Requires;
 }
 
-export interface Embed {
+export interface Page {
   id: Identifier;
   path: Path;
   name: LocalizedText;
   /**
-   * Where the surface renders. Declaring both gives it a community-wide entry
-   * and an entry inside each initiative.
+   * Where the page renders. Declaring both gives it a community-wide entry and
+   * an entry inside each initiative.
    */
   scopes?: SurfaceScope[];
   /**
-   * Only the community's admins open this surface, whatever roles a placement
-   * allows — a settings page, say. Who else may open a surface is chosen in the
+   * Only the community's admins open this page, whatever roles a placement
+   * allows — a settings page, say. Who else may open a page is chosen in the
    * community, per initiative and per role, not declared here.
    */
   admin_only?: boolean;
   /**
-   * Browser features the frame is granted. A surface that names nothing is
-   * framed with all of them denied.
+   * Browser features the frame is granted. A page that names nothing is framed
+   * with all of them denied.
    */
-  capabilities?: EmbedCapability[];
+  capabilities?: PageCapability[];
   requires?: Requires;
 }
 
@@ -1349,7 +1349,7 @@ export interface Manifest {
    */
   community_summary?: NamespacedId;
   widgets?: Widget[];
-  embeds?: Embed[];
+  pages?: Page[];
   /**
    * Ready-made arrangements of this plug-in's own widgets. Publishing the
    * plug-in publishes one ordinary dashboard listing per entry, offered to

@@ -9,7 +9,7 @@
  * | `GET /.well-known/initiative-plugin.json` | a deployment reading the plug-in's manifest document |
  * | `GET, POST /v1/endpoints` | Initiative, with a context token |
  * | `POST /v1/hooks/{name}` | Initiative, with a lifecycle token |
- * | a surface's path | a member's browser, inside Initiative's frame |
+ * | a page's path | a member's browser, inside Initiative's frame |
  *
  * {@link createPlugin} returns a web-standard handler, `(Request) => Promise<Response>`,
  * so the same plug-in runs on any runtime that speaks `Request` and `Response`.
@@ -31,7 +31,7 @@ import {
   type EndpointDeclaration,
   type Handoff,
   type ParamValue,
-  type SurfaceDeclaration,
+  type PageDeclaration,
 } from "./define.js";
 import { Initiative } from "./client.js";
 import { generatePluginKeys, jwkThumbprint, loadPrivateKey, publicJwks, type PluginSigningKey } from "./keys.js";
@@ -54,9 +54,9 @@ export type {
   EndpointCall,
   Handoff,
   Outcome,
+  PageCall,
   RevokeCall,
   ScheduleCall,
-  SurfaceCall,
   WebhookCall,
 } from "./define.js";
 
@@ -147,7 +147,7 @@ export function createPlugin(
       "map" in endpoint ? [] : [[endpointId(plugin, name), endpoint] as const]
     )
   );
-  const surfaces = Object.entries(plugin.surfaces ?? {}).filter(([, surface]) => surface.handler);
+  const pages = Object.entries(plugin.pages ?? {}).filter(([, page]) => page.handler);
   const spent = new Map<string, number>();
 
   const base = (installation: string, narrowing: { initiative?: number } = {}): Call => ({
@@ -256,7 +256,7 @@ export function createPlugin(
     return done instanceof Response ? done : empty(204);
   }
 
-  async function surface(request: Request, id: string, declaration: SurfaceDeclaration): Promise<Response> {
+  async function page(request: Request, id: string, declaration: PageDeclaration): Promise<Response> {
     let handoff: Handoff | null = null;
     if (request.headers.has("authorization")) {
       const claims = await verified(request, (token) => verifyHandoffToken(token, verify));
@@ -268,7 +268,7 @@ export function createPlugin(
       spent.set(claims.jti, claims.exp);
       handoff = {
         ...base(claims.community_ref, claims.initiative_id === undefined ? {} : { initiative: claims.initiative_id }),
-        surface: id,
+        page: id,
         viewer: claims.sub,
         admin: claims.community_admin === true,
         initiative: claims.initiative_id ?? null,
@@ -312,8 +312,8 @@ export function createPlugin(
     if (path === ENDPOINTS_PATH && method === "GET") return json(200, { endpoints: manifest.endpoints ?? [] });
     if (path === ENDPOINTS_PATH && method === "POST") return invoke(request);
     if (method === "POST" && path.startsWith(HOOKS_PATH)) return hook(request, path.slice(HOOKS_PATH.length));
-    for (const [id, declaration] of surfaces) {
-      if (path === declaration.path || path.startsWith(`${declaration.path}/`)) return surface(request, id, declaration);
+    for (const [id, declaration] of pages) {
+      if (path === declaration.path || path.startsWith(`${declaration.path}/`)) return page(request, id, declaration);
     }
     return refuse(404, "not-found");
   }
