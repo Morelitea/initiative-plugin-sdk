@@ -490,7 +490,7 @@ export const FIELDS = {
   schedule: ["id", "every"],
   endpoint: ["id", "label", "description", "returns", "group", "needs_subject", "subject", "per_viewer", "direction", "params", "actors", "admin_only", "public", "requires", "cache_ttl_seconds", "identity", "unavailable", "request", "steps", "map", "errors"],
   widget: ["id", "meta", "template", "endpoint", "strings", "sample_data", "requires"],
-  block: ["id", "areas", "name", "template", "endpoint", "actions", "project_listing", "strings", "requires"],
+  block: ["id", "areas", "name", "template", "endpoint", "actions", "strings", "requires"],
   page: ["id", "path", "name", "scopes", "admin_only", "capabilities", "requires"],
   bundledDashboard: ["uid", "public_id", "name", "description", "layout", "widgets"],
   bundledDashboardWidget: ["id", "type", "title", "grid", "binding"],
@@ -1191,11 +1191,6 @@ export interface Block {
    * changes, with its own access; it answers with the block's fresh row.
    */
   actions?: NamespacedId[];
-  /**
-   * Only on tasks whose project was installed from this listing, by its catalog
-   * uid, such as the built-in Sales pipeline's. Absent: on every task.
-   */
-  project_listing?: string;
   /**
    * This block's own words, keyed, each in the languages it supports. The
    * template reads one as `strings.<key>`, in the reader's language. Name the

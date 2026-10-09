@@ -121,7 +121,6 @@ describe("manifestOf", () => {
               template: '<button action="close-ticket">{{ strings.close }}</button>',
               endpoint: "plugin.acme.tracker.task-tickets",
               actions: ["plugin.acme.tracker.close-ticket"],
-              project_listing: "WY4WAN93PFP3X4",
               strings: { close: { en: "Close" } },
             },
           ],

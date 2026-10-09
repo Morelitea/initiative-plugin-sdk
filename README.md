@@ -270,14 +270,13 @@ template may hold, `<button action>` and `<menu-item action>`.
 
 ```ts
 blocks: {
-  demo: {
-    name: { en: "Demo" },
-    areas: ["task.page.aside"],
-    template: "src/blocks/demo.html",
-    endpoint: "demo-links",          // a read with subject: "task"
-    actions: ["new-link", "revoke"], // writes with subject: "task"
-    project_listing: "WY4WAN93PFP3X4", // only on deals in Sales pipeline projects
-    strings: { new_link: { en: "New link" } },
+  status: {
+    name: { en: "Build status" },
+    areas: ["task.card.inline", "task.page.aside"],
+    template: "src/blocks/status.html",
+    endpoint: "task-builds",   // a read with subject: "task"
+    actions: ["rerun"],        // writes with subject: "task"
+    strings: { rerun: { en: "Run again" } },
   },
 },
 ```
@@ -291,9 +290,11 @@ It reads:
 **Its read is called once per view.** An endpoint declaring `subject: "task"`
 is called with the ids of the view's tasks in `call.tasks`, and answers a
 `task_id` list return so each row says which task it is for. Initiative sends
-only tasks your installation can read itself. Declare `per_viewer: true` when
-the answer depends on who is looking: `call.viewer` then names them, and their
-answer is never served to anyone else.
+only tasks your installation can read itself, and your read decides which of
+them the block is for: a task with no row draws nothing unless the template
+says otherwise. Declare `per_viewer: true` when the answer depends on who is
+looking: `call.viewer` then names them, and their answer is never served to
+anyone else.
 
 **Its actions are yours.** A button runs one of `actions`, a write declaring
 `subject: "task"`, for one task: `call.tasks` holds it and `call.viewer` names

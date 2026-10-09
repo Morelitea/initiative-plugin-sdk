@@ -134,7 +134,6 @@ export function trackerPlugin() {
         template: "blocks/tickets.html",
         endpoint: "task-tickets",
         actions: ["close-ticket"],
-        project_listing: "WY4WAN93PFP3X4",
         strings: { close: { en: "Close" } },
       },
     },
