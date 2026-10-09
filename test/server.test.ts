@@ -21,7 +21,10 @@ const BASE = "https://initiative.example.com/api/v1";
 const platform = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
 const stranger = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
 const pluginKeys = generatePluginKeys({ alg: "ES256", kid: "plugin-1" });
-const TEMPLATES = { "open-count": '<metric :value="values.total" :label="strings.open" />' };
+const TEMPLATES = {
+  widgets: { "open-count": '<metric :value="values.total" :label="strings.open" />' },
+  blocks: { tickets: '<button action="close-ticket">{{ strings.close }}</button>' },
+};
 
 function sign(
   claims: Record<string, unknown>,
@@ -127,6 +130,7 @@ describe("what the plug-in publishes", () => {
     expect(body.endpoints.map((endpoint: { id: string }) => endpoint.id)).toEqual([
       "plugin.acme.tracker.projects",
       "plugin.acme.tracker.open-tickets",
+      "plugin.acme.tracker.task-tickets",
       "plugin.acme.tracker.close-ticket",
       "plugin.acme.tracker.ticket-opened",
     ]);
@@ -167,6 +171,20 @@ describe("endpoint calls", () => {
     expect(call.client.initiative).toBe(5);
   });
 
+  it("hands a block's read the view's tasks and the person looking", async () => {
+    const { body } = await invoke("task-tickets", {}, contextToken("task-tickets", { task_ids: [3, 4], viewer: "uref_bob" }));
+    expect(body.result).toEqual({ task_id: [3, 4], title: ["Broken build", "Broken build"] });
+    const [{ call }] = seen;
+    expect(call).toMatchObject({ tasks: [3, 4], viewer: "uref_bob", actor: { kind: "installation" }, caller: null });
+  });
+
+  it("runs a block's action for its one task, as the installation", async () => {
+    const { status } = await invoke("close-ticket", {}, contextToken("close-ticket", { task_ids: [3], viewer: "uref_bob" }));
+    expect(status).toBe(200);
+    const [{ call }] = seen;
+    expect(call).toMatchObject({ tasks: [3], viewer: "uref_bob", actor: { kind: "installation" } });
+  });
+
   it("reports the actor the handler says ran the call", async () => {
     const { body } = await invoke("open-tickets", { project: "mine" });
     expect(body.actor).toBe("member");
@@ -198,6 +216,7 @@ describe("endpoint calls", () => {
     ["another plug-in, on an endpoint that is not public", () => invoke("projects", {}, contextToken("projects", asMember)), 403, "endpoint-not-public"],
     ["another plug-in, as an actor the endpoint does not take", () => invoke("close-ticket", {}, contextToken("close-ticket", { act: { sub: "acme.github" }, actor: "installation" })), 403, "actor-not-supported"],
     ["a write that no plug-in asked for", () => invoke("close-ticket", {}), 403, "actor-not-supported"],
+    ["a block's write for more than one task", () => invoke("close-ticket", {}, contextToken("close-ticket", { task_ids: [3, 4] })), 403, "actor-not-supported"],
   ];
 
   for (const [what, call, status, says] of refusals) {

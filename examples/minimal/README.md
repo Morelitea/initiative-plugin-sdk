@@ -8,7 +8,7 @@ community's GitLab connection and maps the answer itself.
 | File | What it is |
 |---|---|
 | `src/plugin.ts` | The plug-in: its GitLab connection, the endpoint's request and map, the widget, the listing |
-| `src/widgets/open-issues.ts` | The widget, typed from the endpoint it draws |
+| `src/widgets/open-issues.html` | The widget's template, drawing the endpoint's answer |
 | `test/issue-counts.test.ts` | The request and map run against a recorded answer, `test/fixtures/` |
 | `assets/avatar.png` | The listing's picture |
 

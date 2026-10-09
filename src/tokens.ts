@@ -8,7 +8,9 @@
  *   Scope `endpoint` is a call to one endpoint, named by `endpoint_id`; scope
  *   `lifecycle` is a call to one hook, named by `hook`. When another plug-in made
  *   the call through Initiative it also carries `act` (that plug-in), `actor`,
- *   `member` and, when the caller was confined to one, `initiative_id`.
+ *   `member` and, when the caller was confined to one, `initiative_id`. When a
+ *   block on Initiative's own screens made it, it carries `task_ids` (the tasks
+ *   it is about) and, for a `per_viewer` read or an action, `viewer`.
  * - **Handoff token**, when a member opens one of the plug-in's pages. It names
  *   the member (`sub`), the page, and the initiative it was opened in. It is
  *   for one use.
@@ -96,6 +98,18 @@ export interface ContextClaims extends InitiativeTokenClaims {
    * initiative. Your plug-in is placed there too.
    */
   initiative_id?: number;
+  /**
+   * On a block's call: the tasks it is about, every one of which your
+   * installation can read. A read is called for a view's tasks; an action for
+   * one.
+   */
+  task_ids?: number[];
+  /**
+   * On a block's `per_viewer` read or action: the person looking, by the
+   * reference your installation knows them by. What an action changes, and
+   * whether this person may, is yours to decide.
+   */
+  viewer?: string;
 }
 
 export interface HandoffClaims extends InitiativeTokenClaims {
@@ -253,6 +267,15 @@ function checkCaller(claims: ContextClaims): void {
     (!Number.isInteger(claims.initiative_id) || claims.initiative_id <= 0)
   ) {
     throw new ContextTokenError("initiative_id is not an initiative");
+  }
+  if (
+    claims.task_ids !== undefined &&
+    (!Array.isArray(claims.task_ids) || !claims.task_ids.every((id) => Number.isInteger(id) && id > 0))
+  ) {
+    throw new ContextTokenError("task_ids are not tasks");
+  }
+  if (claims.viewer !== undefined && (typeof claims.viewer !== "string" || !claims.viewer)) {
+    throw new ContextTokenError("viewer names nobody");
   }
 }
 

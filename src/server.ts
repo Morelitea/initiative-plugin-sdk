@@ -178,8 +178,12 @@ export function createPlugin(
     if (claims.act) {
       if (!endpoint.public) return refuse(403, "endpoint-not-public");
       if (!claims.actor || !endpoint.actors?.includes(claims.actor)) return refuse(403, "actor-not-supported");
-    } else if (endpoint.direction === "write") {
-      return refuse(403, "actor-not-supported", "a write is called by another plug-in, as one of its actors");
+    } else if (endpoint.direction === "write" && (endpoint.subject !== "task" || claims.task_ids?.length !== 1)) {
+      return refuse(
+        403,
+        "actor-not-supported",
+        "a write is called by another plug-in, as one of its actors, or by a block for one task"
+      );
     }
 
     const initiativeId = claims.initiative_id;
@@ -195,6 +199,8 @@ export function createPlugin(
           caller: claims.act?.sub ?? null,
           initiative: initiativeId ?? null,
           connections: claims.connection_refs ?? {},
+          tasks: claims.task_ids ?? [],
+          viewer: claims.viewer ?? null,
           client:
             member === undefined
               ? initiative.asInstallation(claims.community_ref, narrowing)
@@ -392,10 +398,14 @@ function builtManifest(plugin: AnyPlugin, given: Manifest | undefined): Manifest
   const path = "manifest.json";
   const built: Manifest | undefined = given ?? (existsSync(path) ? JSON.parse(readFileSync(path, "utf-8")) : undefined);
   if (!built) {
-    if (Object.keys(plugin.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-plugin build");
+    if (Object.keys({ ...plugin.widgets, ...plugin.blocks }).length) {
+      throw new Error("no manifest.json: run initiative-plugin build");
+    }
     return manifestOf(plugin);
   }
-  const templates = Object.fromEntries((built.widgets ?? []).map((widget) => [widget.id, widget.template]));
+  const texts = (built: Array<{ id: string; template: string }> = []) =>
+    Object.fromEntries(built.map((one) => [one.id, one.template]));
+  const templates = { widgets: texts(built.widgets), blocks: texts(built.blocks) };
   if (JSON.stringify(manifestOf(plugin, templates)) !== JSON.stringify(built)) {
     throw new Error("manifest.json does not match the plug-in's definition: run initiative-plugin build");
   }

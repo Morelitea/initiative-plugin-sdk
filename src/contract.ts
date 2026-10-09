@@ -9,8 +9,11 @@
  * cannot describe a manifest the schema refuses, nor miss a term it allows.
  */
 
-export type Feature = "dashboards" | "endpoints" | "pages" | "widgets";
-export const FEATURES: readonly Feature[] = ["dashboards", "endpoints", "pages", "widgets"];
+export type Feature = "blocks" | "dashboards" | "endpoints" | "pages" | "widgets";
+export const FEATURES: readonly Feature[] = ["blocks", "dashboards", "endpoints", "pages", "widgets"];
+
+export type BlockArea = "task.card.inline" | "task.page.header" | "task.page.aside" | "task.page.main" | "task.page.actions";
+export const BLOCK_AREAS: readonly BlockArea[] = ["task.card.inline", "task.page.header", "task.page.aside", "task.page.main", "task.page.actions"];
 
 export type Protocol = 1;
 export const PROTOCOLS: readonly Protocol[] = [1];
@@ -60,6 +63,9 @@ export const DIRECTIONS: readonly Direction[] = ["emit", "read", "write"];
 export type ActorKind = "installation" | "member";
 export const ACTOR_KINDS: readonly ActorKind[] = ["installation", "member"];
 
+export type EndpointSubject = "task";
+export const ENDPOINT_SUBJECTS: readonly EndpointSubject[] = ["task"];
+
 export type Scope = "projects:read" | "projects:write" | "files:read" | "files:write" | "queues:read" | "queues:write" | "counter_groups:read" | "counter_groups:write" | "calendars:read" | "calendars:write" | "dashboards:read" | "dashboards:write" | "posts:read" | "posts:write" | "galleries:read" | "galleries:write" | "wikis:read" | "wikis:write" | "comments:read" | "comments:write" | "relationships:read" | "relationships:write" | "tags:read" | "tags:write" | "properties:read" | "properties:write" | "sharing:read" | "sharing:write" | "members:read" | "initiatives:read" | "initiatives:moderate" | "community:admin";
 export const SCOPES: readonly Scope[] = ["projects:read", "projects:write", "files:read", "files:write", "queues:read", "queues:write", "counter_groups:read", "counter_groups:write", "calendars:read", "calendars:write", "dashboards:read", "dashboards:write", "posts:read", "posts:write", "galleries:read", "galleries:write", "wikis:read", "wikis:write", "comments:read", "comments:write", "relationships:read", "relationships:write", "tags:read", "tags:write", "properties:read", "properties:write", "sharing:read", "sharing:write", "members:read", "initiatives:read", "initiatives:moderate", "community:admin"];
 
@@ -102,6 +108,10 @@ export const CAPS = {
   requiresTerms: 10,
   widgets: 12,
   widgetStrings: 64,
+  blocks: 12,
+  blockStrings: 64,
+  blockActions: 8,
+  blockSubjectIds: 100,
   endpoints: 64,
   paramsPerEndpoint: 12,
   returnsPerEndpoint: 24,
@@ -333,6 +343,23 @@ export const TEMPLATES = {
       "columns"
     ]
   },
+  "blockElements": {
+    "timer": [
+      "since"
+    ],
+    "copy": [
+      "value"
+    ],
+    "button": [
+      "action"
+    ],
+    "menu-item": [
+      "action"
+    ],
+    "open": [
+      "page"
+    ]
+  },
   "classes": [
     "flex",
     "inline-flex",
@@ -461,8 +488,9 @@ export const FIELDS = {
   webhookVerify: ["scheme", "header", "prefix", "encoding", "secret"],
   webhookRoute: ["path", "header", "connection", "field"],
   schedule: ["id", "every"],
-  endpoint: ["id", "label", "description", "returns", "group", "needs_subject", "direction", "params", "actors", "admin_only", "public", "requires", "cache_ttl_seconds", "identity", "unavailable", "request", "steps", "map", "errors"],
+  endpoint: ["id", "label", "description", "returns", "group", "needs_subject", "subject", "per_viewer", "direction", "params", "actors", "admin_only", "public", "requires", "cache_ttl_seconds", "identity", "unavailable", "request", "steps", "map", "errors"],
   widget: ["id", "meta", "template", "endpoint", "strings", "sample_data", "requires"],
+  block: ["id", "areas", "name", "template", "endpoint", "actions", "project_listing", "strings", "requires"],
   page: ["id", "path", "name", "scopes", "admin_only", "capabilities", "requires"],
   bundledDashboard: ["uid", "public_id", "name", "description", "layout", "widgets"],
   bundledDashboardWidget: ["id", "type", "title", "grid", "binding"],
@@ -480,7 +508,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "pages", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "blocks", "pages", "dashboards"],
 } as const;
 
 export type Identifier = string;
@@ -1004,6 +1032,19 @@ export interface Endpoint {
    */
   needs_subject?: Identifier;
   /**
+   * Read and write only. The rows a plug-in block calls this endpoint about. A
+   * read declaring 'task' is called with the task ids of a view (up to 100)
+   * beside its params, and each row it answers names its task in a 'task_id'
+   * return. A write declaring it is a block action, called for one task.
+   */
+  subject?: EndpointSubject;
+  /**
+   * Read only, with 'subject'. The answer depends on who is looking, such as
+   * their own running timer: the call carries the viewer's ref, and an answer
+   * is never served to another viewer.
+   */
+  per_viewer?: boolean;
+  /**
    * 'read' and 'write' are called through the deployment and answer in place;
    * 'emit' travels the other way — the plug-in posts it to a subscriber that
    * registered a URL, so it carries no parameters and nothing to gate.
@@ -1111,6 +1152,56 @@ export interface Widget {
    * network call.
    */
   sample_data?: Record<string, unknown>;
+  requires?: Requires;
+}
+
+export interface Block {
+  id: Identifier;
+  /**
+   * The block areas this block fits. Where it may be offered, not where it
+   * goes: the community's theme places the area, and the community arranges
+   * what is in it.
+   */
+  areas: BlockArea[];
+  /**
+   * What the block is called where a community arranges it, and in its
+   * accessible label.
+   */
+  name: LocalizedText;
+  /**
+   * The block's template, in the vocabulary the contract's `templates` block
+   * lists plus its `blockElements`. It reads `task` (the task it is drawn for),
+   * `answer` (that task's row of the endpoint's answer, or null), `strings`,
+   * `now`, `area` ('inline', 'panel' or 'menu') and `width` ('base', 'sm',
+   * 'md', 'lg' or 'xl'). A `<button action>` or `<menu-item action>` names one
+   * of `actions` by its key (the id after `plugin.<public id>.`), and `<open
+   * page>` one of this manifest's pages. Compiled and checked when the plug-in
+   * is published, and refused if it does not compile. Capped at 16384 UTF-8
+   * bytes, which this schema cannot express.
+   */
+  template: string;
+  /**
+   * The read this block draws, one this manifest declares with `subject:
+   * "task"`. Absent for a block drawn from the task alone.
+   */
+  endpoint?: NamespacedId;
+  /**
+   * The writes its buttons and menu items run, each one this manifest declares
+   * with `subject: "task"`. The plug-in's handler decides what an action
+   * changes, with its own access; it answers with the block's fresh row.
+   */
+  actions?: NamespacedId[];
+  /**
+   * Only on tasks whose project was installed from this listing, by its catalog
+   * uid, such as the built-in Sales pipeline's. Absent: on every task.
+   */
+  project_listing?: string;
+  /**
+   * This block's own words, keyed, each in the languages it supports. The
+   * template reads one as `strings.<key>`, in the reader's language. Name the
+   * keys in snake_case.
+   */
+  strings?: Record<string, LocalizedText>;
   requires?: Requires;
 }
 
@@ -1617,6 +1708,7 @@ export interface Manifest {
    */
   community_summary?: NamespacedId;
   widgets?: Widget[];
+  blocks?: Block[];
   pages?: Page[];
   /**
    * Ready-made arrangements of this plug-in's own widgets. Publishing the

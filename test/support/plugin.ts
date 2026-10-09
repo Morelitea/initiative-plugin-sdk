@@ -36,9 +36,22 @@ export function trackerPlugin() {
     },
   });
 
+  const taskTickets = defineEndpoint({
+    direction: "read",
+    label: { en: "A task's tickets" },
+    subject: "task",
+    per_viewer: true,
+    returns: { task_id: { type: "int", list: true }, title: { type: "string", list: true } },
+    handler: async (call) => {
+      record("task-tickets", call);
+      return { result: { task_id: call.tasks, title: call.tasks.map(() => "Broken build") } };
+    },
+  });
+
   const closeTicket = defineEndpoint({
     direction: "write",
     label: { en: "Close a ticket" },
+    subject: "task",
     public: true,
     actors: ["member"],
     returns: { closed: "bool" },
@@ -87,6 +100,7 @@ export function trackerPlugin() {
     endpoints: {
       projects,
       "open-tickets": openTickets,
+      "task-tickets": taskTickets,
       "close-ticket": closeTicket,
       "ticket-opened": ticketOpened,
     },
@@ -111,6 +125,17 @@ export function trackerPlugin() {
         template: "widgets/open-count.html",
         strings: { open: { en: "Open tickets" } },
         sample_data: { total: 3 },
+      },
+    },
+    blocks: {
+      tickets: {
+        name: { en: "Tickets" },
+        areas: ["task.card.inline", "task.page.aside"],
+        template: "blocks/tickets.html",
+        endpoint: "task-tickets",
+        actions: ["close-ticket"],
+        project_listing: "WY4WAN93PFP3X4",
+        strings: { close: { en: "Close" } },
       },
     },
     pages: {

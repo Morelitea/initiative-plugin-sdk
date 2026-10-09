@@ -603,6 +603,15 @@ export class Client {
     });
   }
 
+  /**
+   * Tell Initiative a block's answer for these tasks has changed, such as a
+   * timer started in the plug-in's own store. Initiative tells the browsers
+   * showing them to read the block again; nothing about the change is sent.
+   */
+  async blockStale(block: string, taskIds: number[]): Promise<void> {
+    await this.installationCall("POST", "/blocks/stale", { block, task_ids: taskIds });
+  }
+
   /** Ask a member to let the plug-in act for them, on Initiative's own consent screen. */
   async requestConsent(request: ConsentRequest): Promise<Record<string, unknown>> {
     const body = await this.send(this.installationGrant(), "POST", "/plugin-platform/consent-requests", {

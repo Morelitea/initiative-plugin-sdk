@@ -108,20 +108,24 @@ function compileBuilt(root: string, file: string): Compiled {
 }
 
 /**
- * Load the plug-in's definition, read its widgets' templates and check the
+ * Load the plug-in's definition, read its widgets' and blocks' templates and check the
  * manifest they make, with nothing written.
  */
 export async function compile(esbuild: Esbuild, root: string, entry: string): Promise<Compiled> {
   const plugin = await loadPlugin(esbuild, root, entry);
-  const templates: Record<string, string> = {};
   const problems: string[] = [];
-  for (const [id, widget] of Object.entries(plugin.widgets ?? {})) {
-    try {
-      templates[id] = readFileSync(resolve(root, widget.template), "utf-8");
-    } catch {
-      problems.push(`widget ${id}: there is no template at ${widget.template}`);
+  const read = (kind: "widget" | "block", declared: Record<string, { template: string }> = {}) => {
+    const texts: Record<string, string> = {};
+    for (const [id, { template }] of Object.entries(declared)) {
+      try {
+        texts[id] = readFileSync(resolve(root, template), "utf-8");
+      } catch {
+        problems.push(`${kind} ${id}: there is no template at ${template}`);
+      }
     }
-  }
+    return texts;
+  };
+  const templates = { widgets: read("widget", plugin.widgets), blocks: read("block", plugin.blocks) };
   return checked(plugin, manifestOf(plugin, templates), problems);
 }
 

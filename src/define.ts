@@ -23,6 +23,7 @@
 
 import type {
   ActorKind,
+  Block,
   PluginScope,
   BundledDashboard,
   BundledDashboardWidget,
@@ -116,6 +117,10 @@ export interface EndpointCall<P> extends Call {
   initiative: number | null;
   /** Connection id → the handle Initiative gives a token for, where the call depends on one. */
   connections: Record<string, string>;
+  /** A block's call: the tasks it is about. Empty for any other call. */
+  tasks: number[];
+  /** A block's `per_viewer` read or action: the person looking, by this installation's reference for them. */
+  viewer: string | null;
 }
 
 /** What a handler answers with. `actor` says whose credential ran it; absent, the call's actor. */
@@ -261,6 +266,11 @@ type ReadName<E> = {
 }[keyof E] &
   string;
 
+type WriteName<E> = {
+  [K in keyof E]: E[K] extends { direction: "write" } ? K : never;
+}[keyof E] &
+  string;
+
 type EmitName<E> = {
   [K in keyof E]: E[K] extends { direction: "emit" } ? K : never;
 }[keyof E] &
@@ -287,6 +297,18 @@ export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "endpoint" | "
   template: string;
   /** What the endpoint would answer, for a preview with no network call. */
   sample_data?: { [K in ReadName<E>]: Result<ReturnsOf<E[K]>> }[ReadName<E>];
+}
+
+export interface BlockDeclaration<E> extends Omit<Block, "id" | "endpoint" | "actions" | "template"> {
+  /** The read the block draws, one declaring `subject: "task"`. */
+  endpoint?: ReadName<E>;
+  /** The writes its buttons and menu items run, each declaring `subject: "task"`. */
+  actions?: WriteName<E>[];
+  /**
+   * The block's template, an `.html` file relative to the plug-in's package.
+   * The build puts its text in the manifest's `template`.
+   */
+  template: string;
 }
 
 export interface DashboardDeclaration<W> extends Omit<BundledDashboard, "widgets"> {
@@ -363,6 +385,8 @@ export interface PluginDefinition<E, W> {
   communitySummary?: ReadName<E>;
   hooks?: Hooks;
   widgets?: W;
+  /** Blocks on Initiative's own screens, keyed by block id. */
+  blocks?: Record<string, BlockDeclaration<E>>;
   /** Pages and panels, keyed by page id. */
   pages?: Record<string, PageDeclaration>;
   dashboards?: DashboardDeclaration<W>[];
@@ -370,10 +394,17 @@ export interface PluginDefinition<E, W> {
 }
 
 /** Any plug-in's definition, as the server and the build read it. */
-export type AnyPlugin = Omit<PluginDefinition<any, any>, "endpoints" | "widgets"> & {
+export type AnyPlugin = Omit<PluginDefinition<any, any>, "endpoints" | "widgets" | "blocks"> & {
   endpoints?: Record<string, EndpointDeclaration>;
   widgets?: Record<string, WidgetDeclaration<any>>;
+  blocks?: Record<string, BlockDeclaration<any>>;
 };
+
+/** The text of each widget's and block's template, by id, as the build read it. */
+export interface Templates {
+  widgets?: Record<string, string>;
+  blocks?: Record<string, string>;
+}
 
 /** The plug-in, declared once. */
 export function definePlugin<
@@ -390,11 +421,11 @@ export function endpointId(plugin: { publicId: string }, name: string): string {
 
 /**
  * The manifest a definition declares: its handlers left out, its keys made
- * ids, in the contract's order. Each widget's `template` is its text, taken
- * from `templates` by widget id. A definition naming `hosts` is declarative, and its
- * manifest has no `service` block.
+ * ids, in the contract's order. Each widget's and block's `template` is its
+ * text, taken from `templates` by id. A definition naming `hosts` is
+ * declarative, and its manifest has no `service` block.
  */
-export function manifestOf(plugin: AnyPlugin, templates: Record<string, string> = {}): Manifest {
+export function manifestOf(plugin: AnyPlugin, templates: Templates = {}): Manifest {
   const id = (name: string) => endpointId(plugin, name);
   const blocks: Partial<Manifest> = {
     vendor: plugin.vendor,
@@ -406,7 +437,14 @@ export function manifestOf(plugin: AnyPlugin, templates: Record<string, string> 
     schedules: listOf(plugin.schedules, (key, schedule) => ({ id: key, every: schedule.every })),
     endpoints: listOf(plugin.endpoints, (key, endpoint) => endpointOf(id(key), endpoint, id)),
     community_summary: plugin.communitySummary === undefined ? undefined : id(plugin.communitySummary),
-    widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, templates[key] ?? "", id)),
+    widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, templates.widgets?.[key] ?? "", id)),
+    blocks: listOf(plugin.blocks, (key, block) => ({
+      id: key,
+      ...block,
+      template: templates.blocks?.[key] ?? "",
+      ...(block.endpoint ? { endpoint: id(block.endpoint) } : {}),
+      ...(block.actions ? { actions: block.actions.map(id) } : {}),
+    })),
     pages: listOf(plugin.pages, (key, page) => {
       const { handler: _handler, ...declared } = page;
       return { id: key, ...declared };

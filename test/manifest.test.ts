@@ -211,6 +211,57 @@ describe("references", () => {
     }
   });
 
+  const block = (overrides: Record<string, unknown> = {}) => ({
+    id: "b",
+    name: { en: "B" },
+    areas: ["task.card.inline"],
+    template: '<button action="act">Go</button>',
+    endpoint: "plugin.acme.tracker.rows",
+    actions: ["plugin.acme.tracker.act"],
+    ...overrides,
+  });
+  const taskEndpoints = [
+    {
+      id: "plugin.acme.tracker.rows",
+      direction: "read",
+      subject: "task",
+      returns: [{ key: "task_id", type: "int", list: true }],
+    },
+    { id: "plugin.acme.tracker.act", direction: "write", subject: "task" },
+  ];
+  const withBlock = (endpoints: unknown[], one: Record<string, unknown>) =>
+    validateManifest({ ...base(), features: ["blocks", "endpoints"], endpoints, blocks: [one] });
+
+  it("takes a block whose read and actions are about tasks", () => {
+    expect(withBlock(taskEndpoints, block())).toEqual([]);
+  });
+
+  it("catches a block drawing a read that is not called with tasks", () => {
+    const problems = withBlock([{ ...taskEndpoints[0], subject: undefined }, taskEndpoints[1]], block());
+    expect(problems.map((one) => one.message)).toEqual([
+      "draws 'plugin.acme.tracker.rows', which is not a declared read with subject 'task'",
+    ]);
+  });
+
+  it("catches a block read whose rows do not say which task they are for", () => {
+    const problems = withBlock([{ ...taskEndpoints[0], returns: [] }, taskEndpoints[1]], block());
+    expect(problems[0].message).toContain("returns no 'task_id' list");
+  });
+
+  it("catches a template running an action its block does not declare", () => {
+    const problems = withBlock(taskEndpoints, block({ actions: [] }));
+    expect(problems.map((one) => one.message)).toEqual(["runs the action 'act', which this block does not declare"]);
+  });
+
+  it("catches per_viewer on a read no block calls", () => {
+    const problems = validateManifest({
+      ...base(),
+      features: ["endpoints"],
+      endpoints: [{ id: "plugin.acme.tracker.mine", direction: "read", per_viewer: true }],
+    });
+    expect(problems[0].message).toContain("per_viewer is for a read with a subject");
+  });
+
   it("catches a requires term naming no declared connection", () => {
     const problems = validateManifest({
       ...base(),

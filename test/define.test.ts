@@ -11,7 +11,10 @@ import { definePlugin, defineEndpoint, validateManifest } from "../src/manifest.
 import { issuesPlugin, trackerPlugin } from "./support/plugin.js";
 
 const { plugin } = trackerPlugin();
-const manifest = manifestOf(plugin, { "open-count": '<metric :value="values.total" :label="strings.open" />' });
+const manifest = manifestOf(plugin, {
+  widgets: { "open-count": '<metric :value="values.total" :label="strings.open" />' },
+  blocks: { tickets: '<button action="close-ticket">{{ strings.close }}</button>' },
+});
 
 describe("manifestOf", () => {
   it("writes the contract's manifest, in its order, with every key made an id", () => {
@@ -20,7 +23,7 @@ describe("manifestOf", () => {
         {
           plugin_kind: "service",
           service: { public_id: "acme.tracker", protocol: 1, scopes: ["projects:read", "plugins:acme.github"] },
-          features: ["dashboards", "endpoints", "pages", "widgets"],
+          features: ["blocks", "dashboards", "endpoints", "pages", "widgets"],
           default_name: "Tracker",
           vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
           connections: [
@@ -69,9 +72,21 @@ describe("manifestOf", () => {
               ],
             },
             {
+              id: "plugin.acme.tracker.task-tickets",
+              direction: "read",
+              label: { en: "A task's tickets" },
+              subject: "task",
+              per_viewer: true,
+              returns: [
+                { key: "task_id", type: "int", list: true },
+                { key: "title", type: "string", list: true },
+              ],
+            },
+            {
               id: "plugin.acme.tracker.close-ticket",
               direction: "write",
               label: { en: "Close a ticket" },
+              subject: "task",
               public: true,
               actors: ["member"],
               returns: [{ key: "closed", type: "bool" }],
@@ -96,6 +111,18 @@ describe("manifestOf", () => {
               template: '<metric :value="values.total" :label="strings.open" />',
               strings: { open: { en: "Open tickets" } },
               sample_data: { total: 3 },
+            },
+          ],
+          blocks: [
+            {
+              id: "tickets",
+              name: { en: "Tickets" },
+              areas: ["task.card.inline", "task.page.aside"],
+              template: '<button action="close-ticket">{{ strings.close }}</button>',
+              endpoint: "plugin.acme.tracker.task-tickets",
+              actions: ["plugin.acme.tracker.close-ticket"],
+              project_listing: "WY4WAN93PFP3X4",
+              strings: { close: { en: "Close" } },
             },
           ],
           pages: [{ id: "board", path: "/board", name: { en: "Board" }, scopes: ["initiative"] }],
@@ -138,7 +165,10 @@ describe("a minimum age", () => {
   it("is written beside the name, by country", () => {
     const aged = manifestOf(
       { ...plugin, minimumAge: { default: 16, US: 13 } },
-      { "open-count": "globalThis.render = function () {};" }
+      {
+        widgets: { "open-count": '<metric :value="values.total" />' },
+        blocks: { tickets: '<button action="close-ticket">{{ strings.close }}</button>' },
+      }
     );
     expect(aged.minimum_age).toEqual({ default: 16, US: 13 });
     expect(Object.keys(aged).indexOf("minimum_age")).toBe(Object.keys(aged).indexOf("default_name") + 1);
@@ -154,7 +184,10 @@ describe("the oldest plug-in API it needs", () => {
   it("is written as min_plugin_api, after the minimum age", () => {
     const needing = manifestOf(
       { ...plugin, minimumAge: { default: 16 }, minPluginApi: "4.1" },
-      { "open-count": "globalThis.render = function () {};" }
+      {
+        widgets: { "open-count": '<metric :value="values.total" />' },
+        blocks: { tickets: '<button action="close-ticket">{{ strings.close }}</button>' },
+      }
     );
     expect(needing.min_plugin_api).toBe("4.1");
     expect(Object.keys(needing).indexOf("min_plugin_api")).toBe(Object.keys(needing).indexOf("minimum_age") + 1);
@@ -168,7 +201,10 @@ describe("the oldest plug-in API it needs", () => {
   it("fails validation when it is not MAJOR.MINOR", () => {
     const wrong = manifestOf(
       { ...plugin, minPluginApi: "4.1.1" },
-      { "open-count": "globalThis.render = function () {};" }
+      {
+        widgets: { "open-count": '<metric :value="values.total" />' },
+        blocks: { tickets: '<button action="close-ticket">{{ strings.close }}</button>' },
+      }
     );
     expect(validateManifest(wrong).map((problem) => problem.where)).toContain("/min_plugin_api");
   });

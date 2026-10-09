@@ -128,6 +128,8 @@ describe("verifyContextToken", () => {
       [{ actor: "robot" }, "unknown actor robot"],
       [{ actor: "member" }, "a member call names no member"],
       [{ initiative_id: 0 }, "initiative_id is not an initiative"],
+      [{ task_ids: ["12"] }, "task_ids are not tasks"],
+      [{ viewer: "" }, "viewer names nobody"],
     ] as const) {
       const token = signJwt(signing, contextClaims(extra), CONTEXT_TOKEN_TYPE);
       expect(await refusal(verifyContextToken(token, options(fetchImpl)))).toBe(message);

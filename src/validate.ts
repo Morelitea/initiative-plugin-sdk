@@ -525,7 +525,7 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
     // this list: an emission is the one endpoint chosen without ever being
     // called, so describing it matters more here than anywhere.
     if (endpoint.direction === "emit") {
-      for (const key of ["params", "requires", "cache_ttl_seconds", "actors", "public"]) {
+      for (const key of ["params", "requires", "cache_ttl_seconds", "actors", "public", "subject"]) {
         if ((endpoint as unknown as Record<string, unknown>)[key] !== undefined) {
           problems.push({
             where: `${where}/${key}`,
@@ -533,6 +533,14 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
           });
         }
       }
+    }
+
+    // A viewer only differs between reads a block makes about its tasks.
+    if (endpoint.per_viewer && (endpoint.direction !== "read" || endpoint.subject === undefined)) {
+      problems.push({
+        where: `${where}/per_viewer`,
+        message: "per_viewer is for a read with a subject — only a block's reads are made for a viewer",
+      });
     }
 
     // Two returns under one name is a value a consumer cannot address: it binds
@@ -642,7 +650,51 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
         message: `binds '${widget.endpoint}', which is not a declared read endpoint`,
       });
     }
-    problems.push(...templateProblems(widget.template, `/widgets/${index}/template`));
+    problems.push(...templateProblems(widget.template, `/widgets/${index}/template`, WIDGET_ELEMENTS));
+  });
+
+  const pageIds = new Set((body.pages ?? []).map((page) => page.id));
+  (body.blocks ?? []).forEach((block, index) => {
+    const where = `/blocks/${index}`;
+    checkRequires(block.requires, `${where}/requires`);
+    // A block's reads and actions are made about its tasks, so each has to be
+    // an endpoint that is called with them.
+    if (block.endpoint !== undefined) {
+      const named = byId.get(block.endpoint);
+      if (named?.direction !== "read" || named.subject !== "task") {
+        problems.push({
+          where: `${where}/endpoint`,
+          message: `draws '${block.endpoint}', which is not a declared read with subject 'task'`,
+        });
+      } else if (!(named.returns ?? []).some((one) => one.key === "task_id" && one.list)) {
+        problems.push({
+          where: `${where}/endpoint`,
+          message: `'${block.endpoint}' returns no 'task_id' list, so no row says which task it is for`,
+        });
+      }
+    }
+    const actionKeys = new Set<string>();
+    (block.actions ?? []).forEach((action, at) => {
+      const named = byId.get(action);
+      if (named?.direction !== "write" || named.subject !== "task") {
+        problems.push({
+          where: `${where}/actions/${at}`,
+          message: `runs '${action}', which is not a declared write with subject 'task'`,
+        });
+      }
+      actionKeys.add(action.startsWith(prefix) ? action.slice(prefix.length) : action);
+    });
+    problems.push(...templateProblems(block.template, `${where}/template`, BLOCK_ELEMENTS));
+    for (const [, key] of block.template.matchAll(/\baction="([^"]*)"/g)) {
+      if (!actionKeys.has(key as string)) {
+        problems.push({ where: `${where}/template`, message: `runs the action '${key}', which this block does not declare` });
+      }
+    }
+    for (const [, id] of block.template.matchAll(/\bpage="([^"]*)"/g)) {
+      if (!pageIds.has(id as string)) {
+        problems.push({ where: `${where}/template`, message: `opens the page '${id}', which this plug-in does not declare` });
+      }
+    }
   });
 
   return problems;
@@ -847,10 +899,13 @@ function scheduleProblems(body: Manifest): ValidationProblem[] {
   return problems;
 }
 
-/** An interval, a schedule's or a health check's, within the schedule bounds. */
-const TEMPLATE_ELEMENTS = new Set<string>([
+const WIDGET_ELEMENTS = new Set<string>([
   ...Object.keys(TEMPLATES.elements),
   ...Object.keys(TEMPLATES.widgetElements),
+]);
+const BLOCK_ELEMENTS = new Set<string>([
+  ...Object.keys(TEMPLATES.elements),
+  ...Object.keys(TEMPLATES.blockElements),
 ]);
 const TEMPLATE_CLASSES = new Set<string>(TEMPLATES.classes);
 
@@ -860,7 +915,11 @@ const TEMPLATE_CLASSES = new Set<string>(TEMPLATES.classes);
  * published; this catches a misspelt element, or a class Initiative does not
  * style for plug-ins, before then.
  */
-function templateProblems(template: string, where: string): ValidationProblem[] {
+function templateProblems(
+  template: string,
+  where: string,
+  allowed: ReadonlySet<string>
+): ValidationProblem[] {
   const problems: ValidationProblem[] = [];
   const bytes = new TextEncoder().encode(template).length;
   if (bytes > CAPS.templateBytes) {
@@ -869,7 +928,7 @@ function templateProblems(template: string, where: string): ValidationProblem[] 
   const elements = new Set<string>();
   for (const [, name] of template.matchAll(/<([a-z][a-z0-9-]*)/g)) elements.add(name as string);
   for (const name of elements) {
-    if (!TEMPLATE_ELEMENTS.has(name)) problems.push({ where, message: `uses <${name}>, which a template may not` });
+    if (!allowed.has(name)) problems.push({ where, message: `uses <${name}>, which a template may not` });
   }
   // `class="…"`, not a bound `:class`, whose classes are only known when it draws.
   const classes = new Set<string>();
@@ -884,6 +943,7 @@ function templateProblems(template: string, where: string): ValidationProblem[] 
   return problems;
 }
 
+/** An interval, a schedule's or a health check's, within the schedule bounds. */
 function intervalProblems(every: string, where: string): ValidationProblem[] {
   const count = Number(every.slice(0, -1));
   const minutes = every.endsWith("h") ? count * 60 : count;
