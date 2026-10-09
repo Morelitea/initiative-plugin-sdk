@@ -14,6 +14,8 @@ holds its tokens, and builds its manifest.
 | `initiative-plugin-sdk/server` | `createPlugin`, `serve`, `EndpointError` |
 | `initiative-plugin-sdk/client` | `Initiative` and the `Client` it gives, acting as the community or a member; plug-in keys |
 | `initiative-plugin-sdk/widget` | What a widget is handed, and the scenes it returns |
+| `initiative-plugin-sdk/parts` | The components a part's tree is built from: `Section`, `Stack`, `Field`, `Value`, `Text`, `Button` |
+| `initiative-plugin-sdk/jsx-runtime` | JSX for a part's tree, with no React |
 | `initiative-plugin-sdk/testing` | A declarative plug-in's requests and maps, run against recorded vendor answers |
 | `initiative-plugin-sdk/plugin-api.json` | The plug-in API contract: the OpenAPI document of every route a plug-in may call |
 | bin `initiative-plugin` | `init`, `build`, `pack`, `dev`, `validate`, `keygen`, `uid`, `schema` |
@@ -74,12 +76,13 @@ export default definePlugin({
   does not compile either.
 - **Endpoints are named by their key.** The manifest id is
   `plugin.<publicId>.<key>`, and everywhere the definition refers to an endpoint
-  (a widget, a sample, a parameter's `options_from`, a bundled dashboard) it
-  uses the key.
+  (a widget, a sample, a parameter's `options_from`, a bundled dashboard, an
+  action) it uses the key.
 - **Everything else is the contract's own shape**, from
   [`manifest.contract.json`](manifest.contract.json): `vendor`, `connections`
   (keyed by id), `webhooks`, `pages` (keyed by id),
-  `dashboards`. The types are generated from the contract, so every term the
+  `dashboards`, `fields` (keyed by metadata key), `parts` and `actions` (keyed
+  by id). The types are generated from the contract, so every term the
   contract declares has a type here.
 - **Features follow from what is filled in.** A plug-in with widgets declares
   `widgets`, and so on.
@@ -94,6 +97,8 @@ export default definePlugin({
 | `caller` | The plug-in that made the call through Initiative, or null for Initiative's own. |
 | `initiative` | The initiative the call is confined to, or null. |
 | `connections` | Connection id → the handle Initiative gives a vendor token for. |
+| `viewer` | On a call one of the plug-in's actions made: the reader who ran it, by this installation's reference for them. Otherwise null. |
+| `subject` | On a call one of the plug-in's actions made: the item it was run on, `{ type, id }`. Otherwise null. |
 | `client` | Initiative, already acting as `actor` and narrowed to `initiative`. |
 | `context` | What you gave `createPlugin` (below). |
 
@@ -102,9 +107,10 @@ credential than the call's own (a read that always uses the community's
 installation, say). To refuse, throw `new EndpointError(status, code, detail)`;
 anything else thrown is answered 500 and logged.
 
-A `write` is reachable only through another plug-in, as one of the actors it
-declares, and only when it is `public`. The SDK refuses anything else before
-the handler runs.
+A `write` is reachable through another plug-in, as one of the actors it
+declares, and only when it is `public`; or through one of the plug-in's own
+actions, on an item kind the action is offered on, as the installation. The
+SDK refuses anything else before the handler runs.
 
 ### Hooks
 
@@ -219,6 +225,105 @@ returns: {
 alpha-2 country, with `default` for every country not listed:
 `{ default: 16, US: 13 }`. It is a declaration; whether a deployment enforces
 it is the deployment's decision.
+
+### Fields, parts and actions
+
+What a plug-in adds to the views and pages of Initiative's items: tasks,
+calendar events, queue items, counters, gallery images and posts
+(`ITEM_KINDS`). Initiative draws all of it with its own components, so no
+plug-in code runs in a reader's browser, and the community's managers place
+it; a plug-in never places itself.
+
+**Metadata** is what the plug-in keeps on an item or on its own install: values
+by key (a lowercase letter, then lowercase letters, digits, `_` and `.`), held
+by Initiative and written with the installation token (`client.metadata`,
+below). Initiative enforces its sizes: a value of at most 8192 bytes as JSON,
+32 keys and 64 KiB on one item, 256 keys and 1 MiB on the install, and 100
+items in one write. A string of at most 255 characters can be found by.
+
+**A field** says how one metadata key is shown. Initiative draws the value with
+its own component for `kind` and computes its plain text itself, so a field
+filters, sorts and exports with no call to the plug-in.
+
+| `kind` | The value |
+|---|---|
+| `text` | a string |
+| `number` | a number |
+| `date` | `"YYYY-MM-DD"` |
+| `datetime` | ISO 8601, with its offset |
+| `link` | `{ url, text? }` |
+| `badge` | `{ text, tone? }` |
+| `progress` | `{ value, max }` |
+| `checkbox` | a boolean |
+
+```ts
+fields: {
+  "demo.link": { name: { en: "Demo" }, kind: "link", on: ["task"], description: { en: "The task's demo" } },
+  "demo.opened": { name: { en: "Opened" }, kind: "number", on: ["task"] },
+},
+```
+
+`on` is the item kinds it is offered on; `description` is the line the view
+editor's Add picker shows; `tone` is a badge's tone when its value names none
+(`accent`, `positive`, `negative`, `warning`, `neutral`, `muted`).
+
+**An action** runs one of the plug-in's write endpoints on one item, from a
+part's button, or from the item's own menu with `menu: true`. Initiative calls
+the endpoint as the installation, with `viewer` and `subject` set, and the
+handler does the work, usually writing metadata. Initiative then answers the
+reader with the item's metadata as it stands. With `confirm`, Initiative asks
+first.
+
+```ts
+actions: {
+  "new-link": { name: { en: "New link" }, endpoint: "create-link", on: ["task"], menu: true },
+},
+```
+
+**A part** is a tree of Initiative's components bound to the plug-in's fields
+and actions, at most 50 nodes and 4 deep. Initiative places at most 3 of a
+plug-in's parts on one item.
+
+| Component | Props | Holds nodes |
+|---|---|---|
+| `section` | `title?`, `collapsed?` | yes |
+| `stack` | `direction?` (`row`, `column`), `gap?` (`none`, `small`, `medium`, `large`), `wrap?` | yes |
+| `field` | `field`: a field's key. Its label and value. | no |
+| `value` | `field`: a field's key. Its value alone. | no |
+| `text` | `text`, `tone?` | no |
+| `button` | `action`: an action's id; `variant?` (`primary`, `secondary`, `ghost`) | no |
+
+Every field and action a part names must be offered on each kind in the
+part's `on`. A tree is plain data, `{ type, props?, children? }`, or JSX through
+the SDK's runtime, which the build turns into the same data:
+
+```tsx
+/** @jsxImportSource initiative-plugin-sdk */
+import { Button, Field, Section, Stack, Text, Value } from "initiative-plugin-sdk/parts";
+
+parts: {
+  demo: {
+    name: { en: "Demo" },
+    on: ["task"],
+    tree: (
+      <Section title={{ en: "Demo" }}>
+        <Field field="demo.link" />
+        <Stack direction="row" gap="small">
+          <Value field="demo.opened" />
+          <Text text={{ en: "times opened" }} tone="muted" />
+        </Stack>
+        <Button action="new-link" />
+      </Section>
+    ),
+  },
+},
+```
+
+The pragma, or `"jsx": "react-jsx"` and `"jsxImportSource":
+"initiative-plugin-sdk"` in `tsconfig.json`, selects the runtime. A fragment's
+children join the node that holds it, and `null` and `false` children are left
+out. `key` is JSX's own and is not passed on, which is why a field is named by
+`field`.
 
 ## 2. Widgets
 
@@ -379,6 +484,13 @@ for (const { installation, active } of await initiative.installations()) {
 - `client.callPlugin(publicId, endpointId, params)` calls another plug-in's public
   endpoint through Initiative. It needs `plugins:<publicId>` among the plug-in's
   scopes, granted by the community.
+- `client.metadata`, the plug-in's metadata, always on the installation's
+  token: `get(itemKind, ids)` answers each item's values by id;
+  `set(itemKind, id, values)` writes some of one item's values, a null
+  removing its key, and answers them as they now stand; `find(key, value)`
+  answers the items holding `value` under `key`, as `{ type, id }`.
+  `metadata.install.get()` and `metadata.install.set(values)` do the same for
+  the install's own values.
 - The installation itself, on any installation token: `client.config()`,
   `client.connections()`, `client.connectionToken(ref)` for a usable vendor
   token, `client.reportConfigStatus({ state, detail })`, and
@@ -646,6 +758,7 @@ npx initiative-plugin schema                   # the JSON Schema it checks again
 `validateManifest` runs the bundled JSON Schema, then the checks a schema
 cannot express: features against the blocks present, ids that must name
 something the manifest declares, connection, vendor setup and schedule rules,
+what a part's nodes and an action name, a part's size and depth,
 and every term the contract does not declare (a deployment discards those
 without saying so). The deployment also enforces byte-size caps.
 
