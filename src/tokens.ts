@@ -106,8 +106,7 @@ export interface ContextClaims extends InitiativeTokenClaims {
   task_ids?: number[];
   /**
    * On a block's `per_viewer` read or action: the person looking, by the
-   * reference your installation knows them by. What an action changes, and
-   * whether this person may, is yours to decide.
+   * reference your installation knows them by.
    */
   viewer?: string;
 }

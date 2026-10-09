@@ -1187,8 +1187,8 @@ export interface Block {
   endpoint?: NamespacedId;
   /**
    * The writes its buttons and menu items run, each one this manifest declares
-   * with `subject: "task"`. The plug-in's handler decides what an action
-   * changes, with its own access; it answers with the block's fresh row.
+   * with `subject: "task"`. A write's answer row for its task becomes the
+   * block's `answer`.
    */
   actions?: NamespacedId[];
   /**
