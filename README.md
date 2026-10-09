@@ -259,6 +259,52 @@ it. Initiative compiles the whole template, checking every field it reads
 against the endpoint's `returns`, when the plug-in is published, and refuses one
 that does not compile.
 
+### Blocks on tasks
+
+A block is a template your plug-in places on Initiative's own task screens:
+in a card's badge row (`task.card.inline`), or on the task page's header,
+side column, main column or actions menu (`task.page.header`, `.aside`,
+`.main`, `.actions`). It is written in the same template language, and adds
+`<timer :since>`, `<copy :value>`, `<open page>` and the only buttons a
+template may hold, `<button action>` and `<menu-item action>`.
+
+```ts
+blocks: {
+  demo: {
+    name: { en: "Demo" },
+    areas: ["task.page.aside"],
+    template: "src/blocks/demo.html",
+    endpoint: "demo-links",          // a read with subject: "task"
+    actions: ["new-link", "revoke"], // writes with subject: "task"
+    project_listing: "WY4WAN93PFP3X4", // only on deals in Sales pipeline projects
+    strings: { new_link: { en: "New link" } },
+  },
+},
+```
+
+It reads:
+- `task`: the task it is drawn for;
+- `answer`: that task's row of the endpoint's answer, or null;
+- `strings`, `now`;
+- `area` (`inline`, `panel` or `menu`) and `width` (`base` to `xl`).
+
+**Its read is called once per view.** An endpoint declaring `subject: "task"`
+is called with the ids of the view's tasks in `call.tasks`, and answers a
+`task_id` list return so each row says which task it is for. Initiative sends
+only tasks your installation can read itself. Declare `per_viewer: true` when
+the answer depends on who is looking: `call.viewer` then names them, and their
+answer is never served to anyone else.
+
+**Its actions are yours.** A button runs one of `actions`, a write declaring
+`subject: "task"`, for one task: `call.tasks` holds it and `call.viewer` names
+who pressed it. Initiative checks that this person may see the task and use
+your plug-in there, then hands the call over. What the action changes, and
+whether this person may, is your handler's decision, made with your
+installation's access. Answer with the task's fresh row, and the block
+redraws. When something changes that no action reported, call
+`client.blockStale(block, taskIds)` and the browsers showing those tasks read
+the block again.
+
 ## 3. Build
 
 ```sh
