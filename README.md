@@ -242,7 +242,8 @@ A template is HTML whose directives and bindings are
 It reads:
 - `rows`: one entry per index across the endpoint's `list` returns;
 - `values`: its single-valued returns;
-- `strings`: the widget's own words, each in the reader's language;
+- `strings`: the widget's own words, each in the reader's language. Name the
+  keys in snake_case (`repository_required`), so `strings.<key>` reads them;
 - `now`: the minute it is drawn.
 
 Besides structure and text it may place the widget elements Initiative draws:
