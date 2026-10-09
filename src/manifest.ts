@@ -9,6 +9,7 @@ export * from "./contract.js";
 export {
   definePlugin,
   defineEndpoint,
+  type ActionDeclaration,
   type Actor,
   type AfterConnectAnswer,
   type AfterConnectCall,

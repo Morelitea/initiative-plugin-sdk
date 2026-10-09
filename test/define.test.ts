@@ -20,7 +20,7 @@ describe("manifestOf", () => {
         {
           plugin_kind: "service",
           service: { public_id: "acme.tracker", protocol: 1, scopes: ["projects:read", "plugins:acme.github"] },
-          features: ["dashboards", "endpoints", "pages", "widgets"],
+          features: ["actions", "dashboards", "endpoints", "fields", "pages", "parts", "widgets"],
           default_name: "Tracker",
           vendor: { fields: [{ key: "client_id", type: "string", required: true, label: { en: "Client id" } }] },
           connections: [
@@ -109,6 +109,24 @@ describe("manifestOf", () => {
                   binding: { endpoint_id: "plugin.acme.tracker.open-tickets", params: { project: "p1" } },
                 },
               ],
+            },
+          ],
+          fields: [{ key: "ticket.link", name: { en: "Ticket" }, kind: "link", on: ["task", "post"] }],
+          parts: [
+            {
+              id: "ticket",
+              name: { en: "Ticket" },
+              on: ["task"],
+              tree: { type: "section", children: [{ type: "field", props: { field: "ticket.link" } }, { type: "button", props: { action: "close" } }] },
+            },
+          ],
+          actions: [
+            {
+              id: "close",
+              name: { en: "Close the ticket" },
+              endpoint: "plugin.acme.tracker.close-ticket",
+              on: ["task"],
+              confirm: { en: "Close it?" },
             },
           ],
         },
@@ -248,6 +266,15 @@ describe("the definition's types", () => {
     definePlugin({ ...name, endpoints: { emitted, read }, webhooks: { ...webhooks, events: [{ when: "true", emit: "emitted", map: "{}" }] } });
     // @ts-expect-error a read is not emitted
     definePlugin({ ...name, endpoints: { emitted, read }, webhooks: { ...webhooks, events: [{ when: "true", emit: "read", map: "{}" }] } });
+  });
+
+  it("refuse an action naming an endpoint that is not a declared write", () => {
+    const read = defineEndpoint({ direction: "read", handler: async () => ({ result: {} }) });
+    const write = defineEndpoint({ direction: "write", handler: async () => ({ result: {} }) });
+    const name = { publicId: "acme.x", uid: "K7M2QX8N4TVB9E", name: "X" };
+    definePlugin({ ...name, endpoints: { read, write }, actions: { a: { name: { en: "A" }, endpoint: "write", on: ["task"] } } });
+    // @ts-expect-error a read changes nothing
+    definePlugin({ ...name, endpoints: { read, write }, actions: { a: { name: { en: "A" }, endpoint: "read", on: ["task"] } } });
   });
 
   it("refuse a widget or a summary naming an endpoint that is not a declared read", () => {

@@ -17,11 +17,12 @@
  *
  * Endpoints are named by their key. The manifest id is `plugin.<publicId>.<key>`,
  * and everywhere a definition refers to an endpoint (a widget, a sample, a
- * parameter's `options_from`, a bundled dashboard, `communitySummary`) it uses the
- * key.
+ * parameter's `options_from`, a bundled dashboard, `communitySummary`, an
+ * action) it uses the key.
  */
 
 import type {
+  Action,
   ActorKind,
   PluginScope,
   BundledDashboard,
@@ -33,7 +34,9 @@ import type {
   EndpointReturn,
   ErrorRule,
   Expression,
+  Field,
   Manifest,
+  Part,
   RequestStep,
   ReturnValueType,
   Scope,
@@ -261,6 +264,11 @@ type ReadName<E> = {
 }[keyof E] &
   string;
 
+type WriteName<E> = {
+  [K in keyof E]: E[K] extends { direction: "write" } ? K : never;
+}[keyof E] &
+  string;
+
 type EmitName<E> = {
   [K in keyof E]: E[K] extends { direction: "emit" } ? K : never;
 }[keyof E] &
@@ -284,6 +292,11 @@ export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "module_source
   module: string;
   /** What each endpoint would answer, for a preview with no network call. */
   sample_data?: { [K in ReadName<E>]?: Result<ReturnsOf<E[K]>> };
+}
+
+/** Something a reader runs on one item. `endpoint` names a write endpoint by its key. */
+export interface ActionDeclaration<E> extends Omit<Action, "id" | "endpoint"> {
+  endpoint: WriteName<E>;
 }
 
 export interface DashboardDeclaration<E, W> extends Omit<BundledDashboard, "widgets"> {
@@ -368,6 +381,12 @@ export interface PluginDefinition<E, W> {
   /** Pages and panels, keyed by page id. */
   pages?: Record<string, PageDeclaration>;
   dashboards?: DashboardDeclaration<E, W>[];
+  /** How the plug-in's metadata is shown on items, keyed by metadata key. */
+  fields?: Record<string, Omit<Field, "key">>;
+  /** Pieces of items' pages and views, keyed by part id. A `tree` may be written as JSX (`initiative-plugin-sdk/parts`). */
+  parts?: Record<string, Omit<Part, "id">>;
+  /** What a reader may run on an item, keyed by action id. */
+  actions?: Record<string, ActionDeclaration<E>>;
   listing?: ListingDeclaration;
 }
 
@@ -420,6 +439,9 @@ export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = 
         binding: { ...widget.binding, endpoint_id: id(widget.binding.endpoint_id) },
       })),
     })),
+    fields: listOf(plugin.fields, (key, field) => ({ key, ...field })),
+    parts: listOf(plugin.parts, (key, part) => ({ id: key, ...part })),
+    actions: listOf(plugin.actions, (key, action) => ({ id: key, ...action, endpoint: id(action.endpoint) })),
   };
   const present = Object.fromEntries(
     Object.entries(blocks).filter(([, value]) => value !== undefined)
