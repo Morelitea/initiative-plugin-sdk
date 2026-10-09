@@ -107,7 +107,7 @@ describe("manifestOf", () => {
               widgets: [
                 {
                   type: "open-count",
-                  binding: { endpoint_id: "plugin.acme.tracker.open-tickets", params: { project: "p1" } },
+                  binding: { params: { project: "p1" } },
                 },
               ],
             },

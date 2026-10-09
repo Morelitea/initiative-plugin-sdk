@@ -75,8 +75,7 @@ export default definePlugin({
   does not compile either.
 - **Endpoints are named by their key.** The manifest id is
   `plugin.<publicId>.<key>`, and everywhere the definition refers to an endpoint
-  (a widget, a sample, a parameter's `options_from`, a bundled dashboard) it
-  uses the key.
+  (a widget, a sample, a parameter's `options_from`) it uses the key.
 - **Everything else is the contract's own shape**, from
   [`manifest.contract.json`](manifest.contract.json): `vendor`, `connections`
   (keyed by id), `webhooks`, `pages` (keyed by id),
@@ -225,7 +224,10 @@ it is the deployment's decision.
 
 A widget is one of the plug-in's read endpoints, drawn by a template. The
 endpoint's `map` shapes the data on Initiative's side, and the template lays it
-out. No widget code runs anywhere.
+out. No widget code runs anywhere. A tile always reads its widget's endpoint, so
+a release can move a widget to another endpoint and every placed tile follows;
+what a tile sets is the endpoint's parameters (`binding.params` on a bundled
+dashboard), and the ones the endpoint does not declare are left out.
 
 ```html
 <!-- src/widgets/open-count.html -->

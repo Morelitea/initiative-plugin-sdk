@@ -127,7 +127,7 @@ export function trackerPlugin() {
         uid: "M3N4P5Q6R7S8T9",
         public_id: "acme.tracker-overview",
         name: "Overview",
-        widgets: [{ type: "open-count", binding: { endpoint_id: "open-tickets", params: { project: "p1" } } }],
+        widgets: [{ type: "open-count", binding: { params: { project: "p1" } } }],
       },
     ],
   });

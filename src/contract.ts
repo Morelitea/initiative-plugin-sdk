@@ -1172,12 +1172,11 @@ export interface BundledDashboardWidget {
     w?: number;
     h?: number;
   };
-  binding: {
-    /**
-     * One of this manifest's own read endpoint ids. Only a read answers with
-     * something to draw.
-     */
-    endpoint_id: NamespacedId;
+  /**
+   * The values this tile reads its widget's endpoint with. The widget names the
+   * endpoint.
+   */
+  binding?: {
     params?: Record<string, string | number | boolean>;
   };
 }

@@ -289,13 +289,8 @@ export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "endpoint" | "
   sample_data?: { [K in ReadName<E>]: Result<ReturnsOf<E[K]>> }[ReadName<E>];
 }
 
-export interface DashboardDeclaration<E, W> extends Omit<BundledDashboard, "widgets"> {
-  widgets: Array<
-    Omit<BundledDashboardWidget, "type" | "binding"> & {
-      type: keyof W & string;
-      binding: Omit<BundledDashboardWidget["binding"], "endpoint_id"> & { endpoint_id: ReadName<E> };
-    }
-  >;
+export interface DashboardDeclaration<W> extends Omit<BundledDashboard, "widgets"> {
+  widgets: Array<Omit<BundledDashboardWidget, "type"> & { type: keyof W & string }>;
 }
 
 /**
@@ -370,7 +365,7 @@ export interface PluginDefinition<E, W> {
   widgets?: W;
   /** Pages and panels, keyed by page id. */
   pages?: Record<string, PageDeclaration>;
-  dashboards?: DashboardDeclaration<E, W>[];
+  dashboards?: DashboardDeclaration<W>[];
   listing?: ListingDeclaration;
 }
 
@@ -416,13 +411,7 @@ export function manifestOf(plugin: AnyPlugin, templates: Record<string, string> 
       const { handler: _handler, ...declared } = page;
       return { id: key, ...declared };
     }),
-    dashboards: plugin.dashboards?.map((dashboard) => ({
-      ...dashboard,
-      widgets: dashboard.widgets.map((widget) => ({
-        ...widget,
-        binding: { ...widget.binding, endpoint_id: id(widget.binding.endpoint_id) },
-      })),
-    })),
+    dashboards: plugin.dashboards,
   };
   const present = Object.fromEntries(
     Object.entries(blocks).filter(([, value]) => value !== undefined)
