@@ -24,11 +24,13 @@ import {
   PAGE_CAPABILITIES,
   FEATURES,
   FIELDS,
+  FIELD_KINDS,
   FIELD_TYPES,
   FLOW_TYPES,
   GITHUB_APP_VALUES,
   GITHUB_PERMISSION_LEVELS,
   HTTP_METHODS,
+  ITEM_KINDS,
   JWT_ALGORITHMS,
   PAGE_LIMITS,
   PARAM_TYPES,
@@ -38,6 +40,7 @@ import {
   STATUS_RANGES,
   SURFACE_SCOPES,
   TOKEN_TYPES,
+  TONES,
   VENDOR_FIELD_TYPES,
 } from "../src/contract.js";
 import { manifestSchema } from "../src/manifest.js";
@@ -95,6 +98,9 @@ describe("the schema draws its vocabulary from the contract", () => {
     ["page limits", PAGE_LIMITS, schema.$defs.pageNumberPaging.properties.on_limit.enum],
     ["status ranges", STATUS_RANGES, schema.$defs.statusMatch.anyOf[1].enum],
     ["connection states", CONNECTION_STATES, schema.$defs.healthState.properties.state.enum],
+    ["item kinds", ITEM_KINDS, schema.$defs.field.properties.on.items.enum],
+    ["field kinds", FIELD_KINDS, schema.$defs.field.properties.kind.enum],
+    ["tones", TONES, schema.$defs.textNode.properties.props.properties.tone.enum],
   ];
 
   it.each(cases)("%s match", (_name, exported, inSchema) => {

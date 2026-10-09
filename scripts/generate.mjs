@@ -81,6 +81,8 @@ function pattern(name, form, prefix = "") {
   // A plain route: leading slash, and neither '//' nor '..'. The two refusals
   // are a lookahead rather than a second rule.
   if (form === "path") return `${lead}(?!.*(?://|\\.\\.))/${cls}*$`;
+  // A lowercase letter first, then anything the set holds.
+  if (form === "letterFirst") return `${lead}[a-z]${cls}*$`;
   throw new Error(`unknown pattern form '${form}'`);
 }
 

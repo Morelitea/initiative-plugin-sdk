@@ -6,8 +6,10 @@
  * (the endpoint a widget binds, a `requires` term's connection, an endpoint's
  * service prefix), the features/blocks cross-check in both directions, UTF-8
  * byte-size caps, the rules tying a connection's `flow` and `token` to its
- * scope and fields, what a vendor `setup` writes to, and the bounds and unique
- * ids of `schedules`.
+ * scope and fields, what a vendor `setup` writes to, the bounds and unique
+ * ids of `schedules`, and the unique keys and ids of `fields`, `parts` and
+ * `actions`, what a part's nodes and an action name, and a part's size and
+ * depth.
  *
  * {@link validateManifest} runs the schema and then every one of those except
  * the byte caps. It also reports every term the contract does not declare: a
@@ -33,7 +35,9 @@ import {
   PLATFORM_CODES,
   type Endpoint,
   type Feature,
+  type ItemKind,
   type Manifest,
+  type PartNode,
   type Requires,
   type VendorRequest,
 } from "./contract.js";
@@ -225,6 +229,7 @@ export function validateManifest(manifest: unknown, options: { publicId?: string
     ...webhookProblems(body),
     ...setupProblems(body),
     ...scheduleProblems(body),
+    ...partProblems(body),
     ...automationProblems(body),
     ...summaryProblems(body),
     ...measureProblems(body),
@@ -374,7 +379,8 @@ type SchemaNode = {
  *
  * Walks the schema itself: a node names a `$ref`, carries `items`, or carries
  * `properties`, and each is followed the same way at every depth. A tagged
- * union is read as the member its value's `kind` names. An object the
+ * union is read as the member whose constants its value holds: a paging's
+ * `kind`, a part node's `type`. An object the
  * contract leaves open (localized text, a widget's `meta`, a binding's
  * `params`) declares no properties, and nothing inside it is checked.
  */
@@ -389,8 +395,12 @@ function undeclaredProblems(body: Manifest): ValidationProblem[] {
   const walk = (value: unknown, node: SchemaNode | undefined, where: string): void => {
     let shape = resolve(node);
     if (shape?.oneOf && typeof value === "object" && value !== null) {
-      const kind = (value as { kind?: unknown }).kind;
-      shape = shape.oneOf.map(resolve).find((member) => member?.properties?.kind?.const === kind);
+      const record = value as Record<string, unknown>;
+      shape = shape.oneOf
+        .map(resolve)
+        .find((member) =>
+          Object.entries(member?.properties ?? {}).every(([key, child]) => child.const === undefined || record[key] === child.const)
+        );
     }
     if (!shape) return;
     if (shape.items) {
@@ -627,9 +637,22 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
     });
   });
 
-  (body.pages ?? []).forEach((page, index) =>
-    checkRequires(page.requires, `/pages/${index}/requires`)
-  );
+  for (const block of ["pages", "fields", "parts", "actions"] as const) {
+    (body[block] ?? []).forEach((item, index) => checkRequires(item.requires, `/${block}/${index}/requires`));
+  }
+  (body.actions ?? []).forEach((action, index) => {
+    // Initiative calls an action's endpoint for the reader, and only a write
+    // does something on their behalf.
+    const named = byId.get(action.endpoint);
+    if (named?.direction !== "write") {
+      problems.push({
+        where: `/actions/${index}/endpoint`,
+        message: named
+          ? `names '${action.endpoint}', which is a ${named.direction} endpoint`
+          : `names '${action.endpoint}', which this manifest does not declare`,
+      });
+    }
+  });
   (body.widgets ?? []).forEach((widget, index) => {
     checkRequires(widget.requires, `/widgets/${index}/requires`);
     for (const id of widget.endpoints ?? []) {
@@ -843,6 +866,58 @@ function scheduleProblems(body: Manifest): ValidationProblem[] {
     }
     seen.add(schedule.id);
     problems.push(...intervalProblems(schedule.every, `${where}/every`));
+  });
+  return problems;
+}
+
+/**
+ * Fields, parts and actions: each declared once, and every part a tree Initiative
+ * can draw on every item kind it is offered on. A node naming a field or an
+ * action that is not offered where the part is would draw nothing there.
+ */
+function partProblems(body: Manifest): ValidationProblem[] {
+  const problems: ValidationProblem[] = [];
+  // Where each is offered, by its key or id, reporting one declared twice.
+  const declared = (block: string, name: "key" | "id", items: Array<[string, ItemKind[]]>) => {
+    const kinds = new Map<string, ItemKind[]>();
+    items.forEach(([id, on], index) => {
+      if (kinds.has(id)) problems.push({ where: `/${block}/${index}/${name}`, message: `'${id}' is declared twice` });
+      kinds.set(id, on);
+    });
+    return kinds;
+  };
+  const fields = declared("fields", "key", (body.fields ?? []).map((field) => [field.key, field.on]));
+  const actions = declared("actions", "id", (body.actions ?? []).map((action) => [action.id, action.on]));
+  declared("parts", "id", (body.parts ?? []).map((part) => [part.id, part.on]));
+
+  (body.parts ?? []).forEach((part, index) => {
+    let count = 0;
+    const reaches = (what: string, kinds: ItemKind[] | undefined, where: string) => {
+      if (!kinds) {
+        problems.push({ where, message: `'${what}' is not declared by this manifest` });
+        return;
+      }
+      const missing = part.on.filter((kind) => !kinds.includes(kind));
+      if (missing.length) {
+        problems.push({ where, message: `'${what}' is not offered on ${missing.join(", ")}, where this part is` });
+      }
+    };
+    const visit = (node: PartNode, depth: number, where: string): void => {
+      count += 1;
+      if (depth > CAPS.partDepth) {
+        problems.push({ where, message: `nested deeper than ${CAPS.partDepth}` });
+        return;
+      }
+      if (node.type === "field" || node.type === "value") reaches(node.props.field, fields.get(node.props.field), `${where}/props/field`);
+      if (node.type === "button") reaches(node.props.action, actions.get(node.props.action), `${where}/props/action`);
+      if (node.type === "section" || node.type === "stack") {
+        (node.children ?? []).forEach((child, position) => visit(child, depth + 1, `${where}/children/${position}`));
+      }
+    };
+    visit(part.tree, 1, `/parts/${index}/tree`);
+    if (count > CAPS.partNodes) {
+      problems.push({ where: `/parts/${index}/tree`, message: `holds ${count} nodes, more than ${CAPS.partNodes}` });
+    }
   });
   return problems;
 }

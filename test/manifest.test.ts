@@ -16,6 +16,7 @@ import {
   type Endpoint,
   type EndpointParam,
   type Manifest,
+  type PartNode,
 } from "../src/manifest.js";
 import { pluginDocument } from "../src/validate.js";
 import { CAPS, SCOPES } from "../src/contract.js";
@@ -1277,6 +1278,110 @@ describe("schedules", () => {
     const twice = scheduled("5m", "1h");
     twice.schedules![1].id = "s-0";
     expect(messages(validateManifest(twice))).toContain("'s-0' is declared twice");
+  });
+});
+
+describe("fields, parts and actions", () => {
+  const field = (key: string): PartNode => ({ type: "field", props: { field: key } });
+  const viewed = (tree: PartNode = { type: "section", children: [field("demo.link")] }): Manifest => ({
+    ...base(),
+    features: ["actions", "endpoints", "fields", "parts"],
+    endpoints: [
+      { id: "plugin.acme.tracker.new-link", direction: "write" },
+      { id: "plugin.acme.tracker.links", direction: "read" },
+    ],
+    fields: [
+      { key: "demo.link", name: { en: "Demo" }, kind: "link", on: ["task", "post"] },
+      { key: "demo.opened", name: { en: "Opened" }, kind: "number", on: ["task"] },
+    ],
+    actions: [{ id: "new-link", name: { en: "New link" }, endpoint: "plugin.acme.tracker.new-link", on: ["task"], menu: true }],
+    parts: [{ id: "demo", name: { en: "Demo" }, on: ["task"], tree }],
+  });
+  const problems = (manifest: Manifest) => messages(validateManifest(manifest));
+
+  it("accepts a part built from every component, bound to its fields and actions", () => {
+    const manifest = viewed({
+      type: "section",
+      props: { title: { en: "Demo" }, collapsed: false },
+      children: [
+        {
+          type: "stack",
+          props: { direction: "row", gap: "small", wrap: true },
+          children: [
+            field("demo.link"),
+            { type: "value", props: { field: "demo.opened" } },
+            { type: "text", props: { text: { en: "opened" }, tone: "muted" } },
+          ],
+        },
+        { type: "button", props: { action: "new-link", variant: "primary" } },
+      ],
+    });
+    expect(problems(manifest)).toBe("");
+  });
+
+  it("checks requires, and that an action runs a declared write", () => {
+    const manifest = viewed();
+    manifest.fields![0].requires = { all_of: ["nope"] };
+    manifest.actions!.push({ ...manifest.actions![0], id: "list", endpoint: "plugin.acme.tracker.links" });
+    manifest.actions!.push({ ...manifest.actions![0], id: "gone", endpoint: "plugin.acme.tracker.gone" });
+    expect(problems(manifest)).toBe(
+      [
+        "/fields/0/requires: requires names unknown connection 'nope'",
+        "/actions/1/endpoint: names 'plugin.acme.tracker.links', which is a read endpoint",
+        "/actions/2/endpoint: names 'plugin.acme.tracker.gone', which this manifest does not declare",
+      ].join("\n")
+    );
+  });
+
+  it("refuses a node naming a field or an action that is not offered everywhere the part is", () => {
+    const manifest = viewed({
+      type: "stack",
+      children: [field("demo.link"), field("demo.opened"), field("demo.missing"), { type: "button", props: { action: "nope" } }],
+    });
+    manifest.parts![0].on = ["task", "post"];
+    expect(problems(manifest)).toBe(
+      [
+        "/parts/0/tree/children/1/props/field: 'demo.opened' is not offered on post, where this part is",
+        "/parts/0/tree/children/2/props/field: 'demo.missing' is not declared by this manifest",
+        "/parts/0/tree/children/3/props/action: 'nope' is not declared by this manifest",
+      ].join("\n")
+    );
+  });
+
+  it("refuses a key or an id declared twice", () => {
+    const manifest = viewed();
+    manifest.fields!.push(manifest.fields![1]);
+    manifest.parts!.push(manifest.parts![0]);
+    manifest.actions!.push(manifest.actions![0]);
+    expect(problems(manifest)).toBe(
+      [
+        "/fields/2/key: 'demo.opened' is declared twice",
+        "/actions/1/id: 'new-link' is declared twice",
+        "/parts/1/id: 'demo' is declared twice",
+      ].join("\n")
+    );
+  });
+
+  it("holds a part to its node and depth caps", () => {
+    const deep = (depth: number): PartNode => (depth === 1 ? field("demo.link") : { type: "section", children: [deep(depth - 1)] });
+    expect(problems(viewed(deep(CAPS.partDepth)))).toBe("");
+    expect(problems(viewed(deep(CAPS.partDepth + 1)))).toContain("/parts/0/tree/children/0/children/0/children/0/children/0: nested deeper than 4");
+    const wide = viewed({ type: "stack", children: Array(CAPS.partNodes).fill(field("demo.link")) });
+    expect(problems(wide)).toContain(`/parts/0/tree: holds ${CAPS.partNodes + 1} nodes, more than ${CAPS.partNodes}`);
+  });
+
+  it("refuses children on a leaf, a prop a component does not take, and a key that is not a metadata key", () => {
+    for (const tree of [
+      { type: "field", props: { field: "demo.link" }, children: [] },
+      { type: "text", props: { text: { en: "x" }, colour: "red" } },
+      { type: "value", props: { field: "Demo.link" } },
+      { type: "chart", props: {} },
+    ]) {
+      expect(validateManifest(viewed(tree as PartNode)).length).toBeGreaterThan(0);
+    }
+    const numbered = viewed();
+    numbered.fields![1].key = "1st";
+    expect(problems(numbered)).toContain("/fields/1/key");
   });
 });
 
