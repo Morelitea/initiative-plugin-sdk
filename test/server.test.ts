@@ -96,6 +96,7 @@ const invoke = (endpoint: string, params: Record<string, unknown>, token = conte
   post("/v1/endpoints", { endpoint: `plugin.acme.tracker.${endpoint}`, params }, token);
 
 const asMember = { act: { sub: "acme.github" }, actor: "member", member: "uref_alice", initiative_id: 5 };
+const fromAction = { viewer: "uref_alice", subject: { type: "task", id: 7 }, initiative_id: 5 };
 
 describe("what the plug-in publishes", () => {
   it("answers health checks", async () => {
@@ -153,6 +154,8 @@ describe("endpoint calls", () => {
       caller: null,
       initiative: null,
       connections: { account: "cref_alice" },
+      viewer: null,
+      subject: null,
     });
     expect(call.client.installation).toBe("gapp_1");
     expect(call.client.actor).toEqual({ kind: "installation" });
@@ -165,6 +168,15 @@ describe("endpoint calls", () => {
     expect(call).toMatchObject({ actor: { kind: "member", member: "uref_alice" }, caller: "acme.github", initiative: 5 });
     expect(call.client.actor).toEqual({ kind: "member", member: "uref_alice" });
     expect(call.client.initiative).toBe(5);
+  });
+
+  it("hands an action's write to the handler as the community's, naming the reader and the item", async () => {
+    const { status, body } = await invoke("close-ticket", {}, contextToken("close-ticket", fromAction));
+    expect(status).toBe(200);
+    expect(body.actor).toBe("installation");
+    const [{ call }] = seen;
+    expect(call).toMatchObject({ actor: { kind: "installation" }, caller: null, viewer: "uref_alice", subject: { type: "task", id: 7 }, initiative: 5 });
+    expect(call.client.actor).toEqual({ kind: "installation" });
   });
 
   it("reports the actor the handler says ran the call", async () => {
@@ -198,6 +210,10 @@ describe("endpoint calls", () => {
     ["another plug-in, on an endpoint that is not public", () => invoke("projects", {}, contextToken("projects", asMember)), 403, "endpoint-not-public"],
     ["another plug-in, as an actor the endpoint does not take", () => invoke("close-ticket", {}, contextToken("close-ticket", { act: { sub: "acme.github" }, actor: "installation" })), 403, "actor-not-supported"],
     ["a write that no plug-in asked for", () => invoke("close-ticket", {}), 403, "actor-not-supported"],
+    ["an action on an item kind it is not offered on", () => invoke("close-ticket", {}, contextToken("close-ticket", { ...fromAction, subject: { type: "post", id: 7 } })), 403, "actor-not-supported"],
+    ["an action naming no reader", () => invoke("close-ticket", {}, contextToken("close-ticket", { subject: { type: "task", id: 7 } })), 401, "unauthorized"],
+    ["an action on something that is not an item", () => invoke("close-ticket", {}, contextToken("close-ticket", { ...fromAction, subject: { type: "widget", id: 7 } })), 401, "unauthorized"],
+    ["an action another plug-in claims to make", () => invoke("close-ticket", {}, contextToken("close-ticket", { ...asMember, ...fromAction })), 401, "unauthorized"],
   ];
 
   for (const [what, call, status, says] of refusals) {

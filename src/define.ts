@@ -35,6 +35,7 @@ import type {
   ErrorRule,
   Expression,
   Field,
+  ItemKind,
   Manifest,
   Part,
   RequestStep,
@@ -98,6 +99,12 @@ export type Params<P> = { [K in keyof P]?: P[K] extends { list: true } ? ParamVa
 /** Whose behalf a call is on: the community, or one of its members by this installation's reference for them. */
 export type Actor = { kind: "installation" } | { kind: "member"; member: string };
 
+/** One of Initiative's items, by its kind and id. */
+export interface ItemRef {
+  type: ItemKind;
+  id: number;
+}
+
 /** What every handler is handed. */
 export interface Call {
   /** The installation: the community, by the reference this plug-in's install knows it by. */
@@ -119,6 +126,10 @@ export interface EndpointCall<P> extends Call {
   initiative: number | null;
   /** Connection id → the handle Initiative gives a token for, where the call depends on one. */
   connections: Record<string, string>;
+  /** On a call one of the plug-in's actions made: the reader who ran it, by this installation's reference for them. */
+  viewer: string | null;
+  /** On a call one of the plug-in's actions made: the item it was run on. */
+  subject: ItemRef | null;
 }
 
 /** What a handler answers with. `actor` says whose credential ran it; absent, the call's actor. */

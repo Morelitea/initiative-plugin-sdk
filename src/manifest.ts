@@ -23,6 +23,7 @@ export {
   type EndpointDeclaration,
   type Handoff,
   type Hooks,
+  type ItemRef,
   type ListingDeclaration,
   type Outcome,
   type PageCall,

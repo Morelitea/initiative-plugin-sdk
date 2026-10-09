@@ -8,7 +8,9 @@
  *   Scope `endpoint` is a call to one endpoint, named by `endpoint_id`; scope
  *   `lifecycle` is a call to one hook, named by `hook`. When another plug-in made
  *   the call through Initiative it also carries `act` (that plug-in), `actor`,
- *   `member` and, when the caller was confined to one, `initiative_id`.
+ *   `member` and, when the caller was confined to one, `initiative_id`. When
+ *   one of the plug-in's actions made the call, it carries `viewer` (the reader
+ *   who ran it) and `subject` (the item it was run on).
  * - **Handoff token**, when a member opens one of the plug-in's pages. It names
  *   the member (`sub`), the page, and the initiative it was opened in. It is
  *   for one use.
@@ -20,7 +22,8 @@
 
 import { createPublicKey, createVerify, type KeyObject } from "node:crypto";
 
-import { ACTOR_KINDS, type ActorKind } from "./contract.js";
+import { ACTOR_KINDS, ITEM_KINDS, type ActorKind, type ItemKind } from "./contract.js";
+import type { ItemRef } from "./define.js";
 
 /**
  * What a context token authorizes.
@@ -96,6 +99,13 @@ export interface ContextClaims extends InitiativeTokenClaims {
    * initiative. Your plug-in is placed there too.
    */
   initiative_id?: number;
+  /**
+   * On a call one of your actions made: the reader who ran it, by the
+   * reference your installation knows them by.
+   */
+  viewer?: string;
+  /** On a call one of your actions made: the item it was run on. */
+  subject?: ItemRef;
 }
 
 export interface HandoffClaims extends InitiativeTokenClaims {
@@ -226,9 +236,9 @@ export async function verifyContextToken(
 }
 
 /**
- * The claims naming another plug-in's call, checked for shape: an `act` names the
- * caller, an `actor` is one of the two kinds, and a `member` call names its
- * member.
+ * The claims naming who a call is for, checked for shape: an `act` names the
+ * caller, an `actor` is one of the two kinds, a `member` call names its
+ * member, and an action's call names both its viewer and its item.
  */
 function checkCaller(claims: ContextClaims): void {
   if (claims.act !== undefined) {
@@ -253,6 +263,27 @@ function checkCaller(claims: ContextClaims): void {
     (!Number.isInteger(claims.initiative_id) || claims.initiative_id <= 0)
   ) {
     throw new ContextTokenError("initiative_id is not an initiative");
+  }
+  if ((claims.viewer === undefined) !== (claims.subject === undefined)) {
+    throw new ContextTokenError("an action call names both its viewer and its item");
+  }
+  if (claims.act !== undefined && claims.viewer !== undefined) {
+    throw new ContextTokenError("an action call is Initiative's own, not another plug-in's");
+  }
+  if (claims.viewer !== undefined && (typeof claims.viewer !== "string" || !claims.viewer)) {
+    throw new ContextTokenError("viewer names no member");
+  }
+  if (claims.subject !== undefined) {
+    const subject = claims.subject as unknown as Record<string, unknown> | null;
+    if (
+      typeof subject !== "object" ||
+      subject === null ||
+      !ITEM_KINDS.includes(subject.type as ItemKind) ||
+      !Number.isInteger(subject.id) ||
+      (subject.id as number) <= 0
+    ) {
+      throw new ContextTokenError("subject is not an item");
+    }
   }
 }
 
