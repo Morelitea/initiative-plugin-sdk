@@ -261,12 +261,15 @@ that does not compile.
 
 ### Blocks on tasks
 
-A block is a template your plug-in places on Initiative's own task screens:
-in a card's badge row (`task.card.inline`), or on the task page's header,
-side column, main column or actions menu (`task.page.header`, `.aside`,
-`.main`, `.actions`). It is written in the same template language, and adds
-`<timer :since>`, `<copy :value>`, `<open page>` and the only buttons a
-template may hold, `<button action>` and `<menu-item action>`.
+A block is a template placed in one of Initiative's block areas:
+
+| Area | Where |
+|---|---|
+| `task.card.inline` | A task card's badge row |
+| `task.page.header` | The task page's header |
+| `task.page.aside` | The task page's side column |
+| `task.page.main` | The task page's main column |
+| `task.page.actions` | The task page's actions menu |
 
 ```ts
 blocks: {
@@ -274,37 +277,33 @@ blocks: {
     name: { en: "Build status" },
     areas: ["task.card.inline", "task.page.aside"],
     template: "src/blocks/status.html",
-    endpoint: "task-builds",   // a read with subject: "task"
-    actions: ["rerun"],        // writes with subject: "task"
+    endpoint: "task-builds",
+    actions: ["rerun"],
     strings: { rerun: { en: "Run again" } },
   },
 },
 ```
 
-It reads:
-- `task`: the task it is drawn for;
-- `answer`: that task's row of the endpoint's answer, or null;
-- `strings`, `now`;
-- `area` (`inline`, `panel` or `menu`) and `width` (`base` to `xl`).
+The template language adds `<timer :since>`, `<copy :value>`, `<open page>`,
+`<button action>` and `<menu-item action>`. A template reads:
+- `task`: the task it is drawn on;
+- `answer`: the row of `endpoint`'s answer whose `task_id` is that task, or null;
+- `strings`, `now`, `area` (`inline`, `panel` or `menu`) and `width` (`base`
+  to `xl`).
 
-**Its read is called once per view.** An endpoint declaring `subject: "task"`
-is called with the ids of the view's tasks in `call.tasks`, and answers a
-`task_id` list return so each row says which task it is for. Initiative sends
-only tasks your installation can read itself, and your read decides which of
-them the block is for: a task with no row draws nothing unless the template
-says otherwise. Declare `per_viewer: true` when the answer depends on who is
-looking: `call.viewer` then names them, and their answer is never served to
-anyone else.
+What a call carries:
+- **A read declaring `subject: "task"`:** `call.tasks`, the tasks being drawn
+  that the installation can read. With `per_viewer: true`, also
+  `call.viewer`, and its answers are cached per viewer.
+- **A write declaring `subject: "task"`, run by a block:** `call.tasks` holding
+  one task, and `call.viewer`. It runs on the installation's credential, and
+  its answer's row for the task is the block's new `answer`.
 
-**Its actions are yours.** A button runs one of `actions`, a write declaring
-`subject: "task"`, for one task: `call.tasks` holds it and `call.viewer` names
-who pressed it. Initiative checks that this person may see the task and use
-your plug-in there, then hands the call over. What the action changes, and
-whether this person may, is your handler's decision, made with your
-installation's access. Answer with the task's fresh row, and the block
-redraws. When something changes that no action reported, call
-`client.blockStale(block, taskIds)` and the browsers showing those tasks read
-the block again.
+Before either call, Initiative checks that the viewer can see the task, that
+the plug-in is placed in the task's initiative with the viewer's role
+allowed, that the installation can read the task, and, for a write, that the
+block declares it. `client.blockStale(block, taskIds)` has the browsers showing
+those tasks read the block's endpoint again.
 
 ## 3. Build
 
