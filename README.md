@@ -240,8 +240,8 @@ run an action.
 by key (a lowercase letter, then lowercase letters, digits, `_` and `.`), held
 by Initiative and written with the installation token (`client.metadata`,
 below). Initiative enforces its sizes: a value of at most 8192 bytes as JSON,
-32 keys and 64 KiB on one item, 256 keys and 1 MiB on the install, and 100
-items in one write. A string of at most 255 characters can be found by.
+32 keys and 64 KiB on one item, and 256 keys and 1 MiB on the install. A
+string of at most 255 characters can be found by.
 
 **A field** says how one metadata key is shown. Initiative draws the value with
 its own component for `kind` and computes its plain text itself, so a field

@@ -1188,7 +1188,7 @@
     },
     "field": {
       "type": "object",
-      "description": "How one of the plug-in's metadata keys is shown on Initiative's items. The plug-in keeps the value in Initiative, through its installation token; Initiative draws it with its own component for `kind` and computes its plain text itself, so a field filters, sorts and exports with no call to the plug-in. Which views show it is chosen by the community's managers, never by the plug-in. Initiative holds what is kept, and these caps are enforced there rather than here: a value of at most 8192 bytes as JSON, with a string of at most 255 characters to be found by; at most 32 keys and 65536 bytes on one item, and 256 keys and 1048576 bytes on the install; at most 100 items in one write.",
+      "description": "How one of the plug-in's metadata keys is shown on Initiative's items. The plug-in keeps the value in Initiative, through its installation token; Initiative draws it with its own component for `kind` and computes its plain text itself, so a field filters, sorts and exports with no call to the plug-in. Which views show it is chosen by the community's managers, never by the plug-in. Initiative holds what is kept, and these caps are enforced there rather than here: a value of at most 8192 bytes as JSON, with a string of at most 255 characters to be found by; at most 32 keys and 65536 bytes on one item, and 256 keys and 1048576 bytes on the install.",
       "required": [
         "key",
         "name",

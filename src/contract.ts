@@ -128,7 +128,6 @@ export const CAPS = {
   metadataBytesPerObject: 65536,
   installMetadataKeys: 256,
   installMetadataBytes: 1048576,
-  metadataWriteObjects: 100,
   partsPlacedPerItem: 3,
   bundledDashboards: 8,
   dashboardWidgets: 50,
@@ -916,8 +915,7 @@ export type MetadataKey = string;
  * the plug-in. Initiative holds what is kept, and these caps are enforced there
  * rather than here: a value of at most 8192 bytes as JSON, with a string of at
  * most 255 characters to be found by; at most 32 keys and 65536 bytes on one
- * item, and 256 keys and 1048576 bytes on the install; at most 100 items in one
- * write.
+ * item, and 256 keys and 1048576 bytes on the install.
  */
 export interface Field {
   /**
