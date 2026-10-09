@@ -170,6 +170,21 @@ describe("build", () => {
     expect(await run()).toBe(1);
     expect(errors.join("")).toContain("over the 65536-byte cap");
   });
+
+  it("writes a part written as JSX as its plain tree", async () => {
+    const parts = join(here, "..", "src", "parts.js");
+    write({
+      // The SDK's own source stands in for the installed package.
+      "tsconfig.json": JSON.stringify({ compilerOptions: { jsx: "react-jsx", jsxImportSource: join(here, "..", "src") } }),
+      "src/plugin.tsx": `import { Field, Section } from ${JSON.stringify(parts)};\n${plugin(`
+  fields: { "demo.link": { name: { en: "Demo" }, kind: "link", on: ["task"] } },
+  parts: { demo: { name: { en: "Demo" }, on: ["task"], tree: <Section><><Field field="demo.link" /></></Section> } },`)}`,
+    });
+    expect(await build({ root, plugin: "src/plugin.tsx", check: false })).toBe(0);
+    expect(manifest().parts).toEqual([
+      { id: "demo", name: { en: "Demo" }, on: ["task"], tree: { type: "section", children: [{ type: "field", props: { field: "demo.link" } }] } },
+    ]);
+  });
 });
 
 describe("the registry source", () => {

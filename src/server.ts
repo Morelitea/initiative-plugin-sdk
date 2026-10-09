@@ -21,7 +21,7 @@ import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
-import type { ActorKind, Manifest } from "./contract.js";
+import type { ActorKind, ItemKind, Manifest } from "./contract.js";
 import {
   endpointId,
   manifestOf,
@@ -53,6 +53,7 @@ export type {
   Call,
   EndpointCall,
   Handoff,
+  ItemRef,
   Outcome,
   PageCall,
   RevokeCall,
@@ -147,6 +148,12 @@ export function createPlugin(
       "map" in endpoint ? [] : [[endpointId(plugin, name), endpoint] as const]
     )
   );
+  // Endpoint id → the item kinds the plug-in's actions run it on.
+  const actionKinds = new Map<string, ItemKind[]>();
+  for (const action of Object.values(plugin.actions ?? {})) {
+    const id = endpointId(plugin, action.endpoint);
+    actionKinds.set(id, [...(actionKinds.get(id) ?? []), ...action.on]);
+  }
   const pages = Object.entries(plugin.pages ?? {}).filter(([, page]) => page.handler);
   const spent = new Map<string, number>();
 
@@ -178,8 +185,12 @@ export function createPlugin(
     if (claims.act) {
       if (!endpoint.public) return refuse(403, "endpoint-not-public");
       if (!claims.actor || !endpoint.actors?.includes(claims.actor)) return refuse(403, "actor-not-supported");
-    } else if (endpoint.direction === "write") {
-      return refuse(403, "actor-not-supported", "a write is called by another plug-in, as one of its actors");
+    } else if (endpoint.direction === "write" && !(claims.subject && actionKinds.get(id)?.includes(claims.subject.type))) {
+      return refuse(
+        403,
+        "actor-not-supported",
+        "a write is called by another plug-in, as one of its actors, or by one of this plug-in's actions, on an item it is offered on"
+      );
     }
 
     const initiativeId = claims.initiative_id;
@@ -195,6 +206,8 @@ export function createPlugin(
           caller: claims.act?.sub ?? null,
           initiative: initiativeId ?? null,
           connections: claims.connection_refs ?? {},
+          viewer: claims.viewer ?? null,
+          subject: claims.subject ?? null,
           client:
             member === undefined
               ? initiative.asInstallation(claims.community_ref, narrowing)

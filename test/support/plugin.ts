@@ -129,6 +129,15 @@ export function trackerPlugin() {
         widgets: [{ type: "open-count", binding: { endpoint_id: "open-tickets", params: { project: "p1" } } }],
       },
     ],
+    fields: { "ticket.link": { name: { en: "Ticket" }, kind: "link", on: ["task", "post"] } },
+    parts: {
+      ticket: {
+        name: { en: "Ticket" },
+        on: ["task"],
+        tree: { type: "section", children: [{ type: "field", props: { field: "ticket.link" } }, { type: "button", props: { action: "close" } }] },
+      },
+    },
+    actions: { close: { name: { en: "Close the ticket" }, endpoint: "close-ticket", on: ["task"], confirm: { en: "Close it?" } } },
   });
   return { plugin, seen };
 }

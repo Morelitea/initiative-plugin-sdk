@@ -9,8 +9,8 @@
  * cannot describe a manifest the schema refuses, nor miss a term it allows.
  */
 
-export type Feature = "dashboards" | "endpoints" | "pages" | "widgets";
-export const FEATURES: readonly Feature[] = ["dashboards", "endpoints", "pages", "widgets"];
+export type Feature = "actions" | "dashboards" | "endpoints" | "fields" | "pages" | "parts" | "widgets";
+export const FEATURES: readonly Feature[] = ["actions", "dashboards", "endpoints", "fields", "pages", "parts", "widgets"];
 
 export type Protocol = 1;
 export const PROTOCOLS: readonly Protocol[] = [1];
@@ -69,6 +69,15 @@ export const SURFACE_SCOPES: readonly SurfaceScope[] = ["community", "initiative
 export type PageCapability = "camera" | "clipboard-read" | "clipboard-write" | "display-capture" | "fullscreen" | "geolocation" | "microphone";
 export const PAGE_CAPABILITIES: readonly PageCapability[] = ["camera", "clipboard-read", "clipboard-write", "display-capture", "fullscreen", "geolocation", "microphone"];
 
+export type ItemKind = "task" | "calendar_event" | "queue_item" | "counter" | "gallery_image" | "post";
+export const ITEM_KINDS: readonly ItemKind[] = ["task", "calendar_event", "queue_item", "counter", "gallery_image", "post"];
+
+export type FieldKind = "text" | "number" | "date" | "datetime" | "link" | "badge" | "progress" | "checkbox";
+export const FIELD_KINDS: readonly FieldKind[] = ["text", "number", "date", "datetime", "link", "badge", "progress", "checkbox"];
+
+export type Tone = "accent" | "positive" | "negative" | "warning" | "neutral" | "muted";
+export const TONES: readonly Tone[] = ["accent", "positive", "negative", "warning", "neutral", "muted"];
+
 export type ListingKind = "plugin" | "dashboard";
 export const LISTING_KINDS: readonly ListingKind[] = ["plugin", "dashboard"];
 
@@ -107,6 +116,19 @@ export const CAPS = {
   returnsPerEndpoint: 24,
   pages: 12,
   pageCapabilities: 8,
+  fields: 32,
+  parts: 16,
+  actions: 16,
+  partNodes: 50,
+  partDepth: 4,
+  metadataKeyLength: 64,
+  metadataValueBytes: 8192,
+  metadataLookupLength: 255,
+  metadataKeysPerObject: 32,
+  metadataBytesPerObject: 65536,
+  installMetadataKeys: 256,
+  installMetadataBytes: 1048576,
+  partsPlacedPerItem: 3,
   bundledDashboards: 8,
   dashboardWidgets: 50,
   dashboardGridColumns: 12,
@@ -175,6 +197,7 @@ export const CHARSETS = {
   version: "0123456789.-+abcdefghijklmnopqrstuvwxyz",
   artwork: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-",
   queryName: "-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz~",
+  metadataKey: "._0123456789abcdefghijklmnopqrstuvwxyz",
 } as const;
 
 /**
@@ -203,6 +226,15 @@ export const FIELDS = {
   endpoint: ["id", "label", "description", "returns", "group", "needs_subject", "direction", "params", "actors", "admin_only", "public", "requires", "cache_ttl_seconds", "identity", "unavailable", "request", "steps", "map", "errors"],
   widget: ["id", "meta", "module_source", "endpoints", "sample_data", "requires"],
   page: ["id", "path", "name", "scopes", "admin_only", "capabilities", "requires"],
+  field: ["key", "name", "kind", "on", "description", "tone", "requires"],
+  sectionNode: ["type", "props", "children"],
+  stackNode: ["type", "props", "children"],
+  fieldNode: ["type", "props"],
+  valueNode: ["type", "props"],
+  textNode: ["type", "props"],
+  buttonNode: ["type", "props"],
+  part: ["id", "name", "on", "tree", "description", "requires"],
+  action: ["id", "name", "endpoint", "on", "confirm", "menu", "requires"],
   bundledDashboard: ["uid", "public_id", "name", "description", "layout", "widgets"],
   bundledDashboardWidget: ["id", "type", "title", "grid", "binding"],
   endpointIdentity: ["kind", "key"],
@@ -219,7 +251,7 @@ export const FIELDS = {
   healthState: ["status", "when", "state"],
   webhookEvent: ["when", "emit", "map"],
   webhookStatus: ["when", "connection", "state"],
-  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "pages", "dashboards"],
+  manifest: ["plugin_kind", "service", "features", "default_name", "minimum_age", "min_plugin_api", "hosts", "auth", "vendor", "connections", "webhooks", "schedules", "endpoints", "community_summary", "widgets", "pages", "dashboards", "fields", "parts", "actions"],
 } as const;
 
 export type Identifier = string;
@@ -868,6 +900,223 @@ export interface Page {
   requires?: Requires;
 }
 
+/**
+ * A key the plug-in keeps a value under, on an item or on its own install: a
+ * lowercase letter, then lowercase letters, digits, '_' and '.'.
+ */
+export type MetadataKey = string;
+
+/**
+ * How one of the plug-in's metadata keys is shown on Initiative's items. The
+ * plug-in keeps the value in Initiative, through its installation token;
+ * Initiative draws it with its own component for `kind` and computes its plain
+ * text itself, so a field filters, sorts and exports with no call to the
+ * plug-in. Which views show it is chosen by the community's managers, never by
+ * the plug-in. Initiative holds what is kept, and these caps are enforced there
+ * rather than here: a value of at most 8192 bytes as JSON, with a string of at
+ * most 255 characters to be found by; at most 32 keys and 65536 bytes on one
+ * item, and 256 keys and 1048576 bytes on the install.
+ */
+export interface Field {
+  /**
+   * The metadata key whose value this shows. Unique among this manifest's
+   * fields.
+   */
+  key: MetadataKey;
+  /**
+   * The field's label.
+   */
+  name: LocalizedText;
+  /**
+   * What the value is, and so how it is drawn: 'text' a string; 'number' a
+   * number; 'date' a 'YYYY-MM-DD' string; 'datetime' an ISO 8601 string with
+   * its offset; 'link' {url, text?}; 'badge' {text, tone?}; 'progress' {value,
+   * max}; 'checkbox' a boolean.
+   */
+  kind: FieldKind;
+  /**
+   * The item kinds it is offered on.
+   */
+  on: ItemKind[];
+  /**
+   * The one line the view editor's Add picker shows beside the name.
+   */
+  description?: LocalizedText;
+  /**
+   * A badge's tone when its value names none.
+   */
+  tone?: Tone;
+  requires?: Requires;
+}
+
+/**
+ * One node of a part: one of Initiative's own components, told apart by 'type',
+ * with its props and, for a section or a stack, the nodes inside it.
+ */
+export type PartNode = SectionNode | StackNode | FieldNode | ValueNode | TextNode | ButtonNode;
+
+/**
+ * A titled group, which the reader may fold.
+ */
+export interface SectionNode {
+  type: "section";
+  props?: {
+    title?: LocalizedText;
+    /**
+     * Drawn folded until the reader opens it.
+     */
+    collapsed?: boolean;
+  };
+  /**
+   * Drawn in order, inside this one.
+   */
+  children?: PartNode[];
+}
+
+/**
+ * Nodes side by side or one above another.
+ */
+export interface StackNode {
+  type: "stack";
+  props?: {
+    direction?: "row" | "column";
+    /**
+     * The space between the nodes. Absent: Initiative's own.
+     */
+    gap?: "none" | "small" | "medium" | "large";
+    /**
+     * A row runs onto a second line rather than past its edge.
+     */
+    wrap?: boolean;
+  };
+  /**
+   * Drawn in order, inside this one.
+   */
+  children?: PartNode[];
+}
+
+/**
+ * A field's label and its value.
+ */
+export interface FieldNode {
+  type: "field";
+  props: {
+    /**
+     * One of this manifest's fields, by its key, offered on every item kind the
+     * part is.
+     */
+    field: MetadataKey;
+  };
+}
+
+/**
+ * A field's value alone.
+ */
+export interface ValueNode {
+  type: "value";
+  props: {
+    /**
+     * One of this manifest's fields, by its key, offered on every item kind the
+     * part is.
+     */
+    field: MetadataKey;
+  };
+}
+
+/**
+ * Words the plug-in wrote.
+ */
+export interface TextNode {
+  type: "text";
+  props: {
+    text: LocalizedText;
+    tone?: Tone;
+  };
+}
+
+/**
+ * A button that runs one of this plug-in's actions on the item, labelled with
+ * the action's name.
+ */
+export interface ButtonNode {
+  type: "button";
+  props: {
+    /**
+     * One of this manifest's actions, by its id, offered on every item kind the
+     * part is.
+     */
+    action: Identifier;
+    variant?: "primary" | "secondary" | "ghost";
+  };
+}
+
+/**
+ * A piece of an item's page or view, built from Initiative's own components and
+ * bound to this plug-in's fields and actions. Data only: Initiative draws each
+ * node, and no plug-in code runs in the reader's browser. Which views show it
+ * is chosen by the community's managers, never by the plug-in, and Initiative
+ * places at most 3 of a plug-in's parts on one item.
+ */
+export interface Part {
+  /**
+   * Unique among this manifest's parts.
+   */
+  id: Identifier;
+  /**
+   * What the view editor calls it.
+   */
+  name: LocalizedText;
+  /**
+   * The item kinds it is offered on.
+   */
+  on: ItemKind[];
+  /**
+   * What is drawn: at most 50 nodes, at most 4 deep.
+   */
+  tree: PartNode;
+  /**
+   * The one line the view editor's Add picker shows beside the name.
+   */
+  description?: LocalizedText;
+  requires?: Requires;
+}
+
+/**
+ * Something a reader runs on one item, from a part's button or the item's own
+ * menu. Initiative only connects: it calls the write endpoint as the
+ * installation, with the reader as 'viewer' and the item as 'subject' in the
+ * call's token, and the endpoint does the work, usually writing the plug-in's
+ * metadata. Initiative then answers the reader with the item's metadata as it
+ * stands.
+ */
+export interface Action {
+  /**
+   * Unique among this manifest's actions.
+   */
+  id: Identifier;
+  /**
+   * The button's or the menu entry's label.
+   */
+  name: LocalizedText;
+  /**
+   * A write endpoint this manifest declares.
+   */
+  endpoint: NamespacedId;
+  /**
+   * The item kinds it is offered on.
+   */
+  on: ItemKind[];
+  /**
+   * A question Initiative asks before running it. Absent: it runs at once.
+   */
+  confirm?: LocalizedText;
+  /**
+   * Also offered in the item's own menu.
+   */
+  menu?: boolean;
+  requires?: Requires;
+}
+
 export interface BundledDashboard {
   /**
    * This dashboard's own catalog id — publisher-assigned, immutable, never
@@ -1262,8 +1511,10 @@ export interface WebhookStatus {
  * in both directions, UTF-8 byte-size caps, the rules tying a connection's flow
  * and token to its scope and fields, what a webhooks block names, what a vendor
  * setup writes to, whether every expression parses, what a declarative request
- * and its steps name, and the bounds and unique ids of schedules are enforced
- * by the platform on publish and are not expressible here.
+ * and its steps name, the bounds and unique ids of schedules, the unique keys
+ * and ids of fields, parts and actions, what a part's nodes and an action name,
+ * and a part's size and depth are enforced by the platform on publish and are
+ * not expressible here.
  */
 export interface Manifest {
   /**
@@ -1356,4 +1607,22 @@ export interface Manifest {
    * communities that install the plug-in.
    */
   dashboards?: BundledDashboard[];
+  /**
+   * How the plug-in's metadata is shown on items. A container plug-in's only: a
+   * declarative plug-in holds no installation token, so it keeps no metadata to
+   * show.
+   */
+  fields?: Field[];
+  /**
+   * Pieces of items' pages and views, built from Initiative's components and
+   * bound to the plug-in's fields and actions. A container plug-in's only, as
+   * fields are.
+   */
+  parts?: Part[];
+  /**
+   * What a reader may run on an item, each one of the plug-in's write
+   * endpoints. A container plug-in's only: a declarative plug-in has no handler
+   * to do an action's work.
+   */
+  actions?: Action[];
 }

@@ -14,7 +14,8 @@
  * {@link Initiative.asMember} each give a {@link Client} acting that way; a
  * handler is handed one already acting for its call. {@link Client.api} holds
  * a typed method for every route Initiative's plug-in API describes, generated
- * from that description.
+ * from that description, and {@link Client.metadata} the values the plug-in
+ * keeps on Initiative's items.
  *
  * Tokens are opaque and never read. The token response says how long each
  * lives and which scopes it holds: a call needing a scope the token does not
@@ -32,8 +33,8 @@ import {
   type PluginApiOperation,
   type PluginApiOperationId,
 } from "./plugin-api.generated.js";
-import type { ActorKind, PluginScope, Scope } from "./contract.js";
-import type { Actor } from "./define.js";
+import type { ActorKind, ItemKind, PluginScope, Scope } from "./contract.js";
+import type { Actor, ItemRef } from "./define.js";
 import { signJwt, type PluginSigningKey } from "./keys.js";
 
 export {
@@ -190,6 +191,29 @@ export interface ConsentRequest {
   initiativeId?: number;
   /** What the plug-in asks for. The member may grant less. */
   access: "read" | "read_write";
+}
+
+/** The plug-in's values on one item or on its install, by metadata key. */
+export type MetadataValues = Record<string, unknown>;
+
+/**
+ * The values the plug-in keeps in Initiative, by metadata key: on items, which
+ * its manifest's fields show, and on its own install. Always on the
+ * installation's token, narrowed to the client's initiative.
+ */
+export interface Metadata {
+  /** Each item's values, by id. An item holding none is left out. */
+  get(itemKind: ItemKind, ids: readonly number[]): Promise<Record<number, MetadataValues>>;
+  /** Writes some of one item's values; a null removes its key. Answers the item's values as they now stand. */
+  set(itemKind: ItemKind, id: number, values: MetadataValues): Promise<MetadataValues>;
+  /** The items holding `value` under `key`. */
+  find(key: string, value: string): Promise<ItemRef[]>;
+  /** The install's own values. */
+  install: {
+    get(): Promise<MetadataValues>;
+    /** Writes some of the install's values; a null removes its key. Answers them as they now stand. */
+    set(values: MetadataValues): Promise<MetadataValues>;
+  };
 }
 
 /** The token endpoint refused (RFC 6749 §5.2). */
@@ -454,6 +478,7 @@ function grantOf(installation: string, narrowing: Narrowing): Grant {
  */
 export class Client {
   private pluginApi?: PluginApi;
+  private metadataStore?: Metadata;
 
   constructor(
     private readonly tokens: Tokens,
@@ -468,6 +493,42 @@ export class Client {
    */
   get api(): PluginApi {
     return (this.pluginApi ??= new PluginApi((operation, args) => this.operation(operation, args)));
+  }
+
+  /**
+   * The values the plug-in keeps on Initiative's items and on its install:
+   * `client.metadata.set("task", 7, { "demo.opened": 3 })`.
+   */
+  get metadata(): Metadata {
+    const read = async (entityType: ItemKind | "plugin", ids: readonly number[]) => {
+      const body = (await this.installationCall(
+        "GET",
+        `/metadata${queryOf({ entity_type: entityType, entity_ids: ids })}`
+      )) as Record<string, unknown>;
+      return Array.isArray(body.items) ? (body.items as Array<Record<string, unknown>>) : [];
+    };
+    const write = async (entity: Record<string, unknown>, values: MetadataValues) => {
+      const body = (await this.installationCall("PUT", "/metadata", { ...entity, values })) as Record<string, unknown>;
+      return isRecord(body.values) ? body.values : {};
+    };
+    const valuesOf = (item: Record<string, unknown> | undefined) => (isRecord(item?.values) ? item.values : {});
+    return (this.metadataStore ??= {
+      get: async (itemKind, ids) =>
+        ids.length
+          ? Object.fromEntries((await read(itemKind, ids)).map((item) => [Number(item.entity_id), valuesOf(item)]))
+          : {},
+      set: (itemKind, id, values) => write({ entity_type: itemKind, entity_id: id }, values),
+      find: async (key, value) => {
+        const body = (await this.installationCall("GET", `/metadata/lookup${queryOf({ key, value })}`)) as Record<string, unknown>;
+        return Array.isArray(body.items)
+          ? body.items.map((item: Record<string, unknown>) => ({ type: item.entity_type as ItemKind, id: Number(item.entity_id) }))
+          : [];
+      },
+      install: {
+        get: async () => valuesOf((await read("plugin", []))[0]),
+        set: (values) => write({ entity_type: "plugin" }, values),
+      },
+    });
   }
 
   get installation(): string {

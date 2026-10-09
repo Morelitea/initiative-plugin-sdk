@@ -333,6 +333,39 @@ describe("the installation itself", () => {
     expect(tokenForms()).toHaveLength(1);
   });
 
+  it("reads, writes and finds the plug-in's metadata on items and on its install, on the installation's token", async () => {
+    answers.set("GET /api/v1/plugin-platform/installation/metadata", (request) =>
+      new URL(request.url).searchParams.get("entity_type") === "plugin"
+        ? json(200, { items: [{ entity_type: "plugin", values: { synced: true } }] })
+        : json(200, { items: [{ entity_type: "task", entity_id: 7, values: { "demo.opened": 3 } }] })
+    );
+    answers.set("PUT /api/v1/plugin-platform/installation/metadata", (request) => json(200, { values: { "demo.opened": 4 }, echoed: JSON.parse(request.body) }));
+    answers.set("GET /api/v1/plugin-platform/installation/metadata/lookup", () => json(200, { items: [{ entity_type: "task", entity_id: 7 }] }));
+    const { metadata } = initiative().asMember("gapp_1", "uapp_alice", { initiative: 5 });
+
+    expect(await metadata.get("task", [7, 8])).toEqual({ 7: { "demo.opened": 3 } });
+    expect(await metadata.set("task", 7, { "demo.opened": 4, "demo.link": null })).toEqual({ "demo.opened": 4 });
+    expect(await metadata.find("demo.ref", "abc 1")).toEqual([{ type: "task", id: 7 }]);
+    expect(await metadata.install.get()).toEqual({ synced: true });
+    await metadata.install.set({ synced: null });
+    expect(await metadata.get("task", [])).toEqual({});
+
+    const calls = sent.filter((one) => one.url !== TOKEN_URL);
+    expect(calls.map((one) => `${one.method} ${one.url.slice(BASE.length)}`)).toEqual([
+      "GET /plugin-platform/installation/metadata?entity_type=task&entity_ids=7&entity_ids=8",
+      "PUT /plugin-platform/installation/metadata",
+      "GET /plugin-platform/installation/metadata/lookup?key=demo.ref&value=abc+1",
+      "GET /plugin-platform/installation/metadata?entity_type=plugin",
+      "PUT /plugin-platform/installation/metadata",
+    ]);
+    expect(JSON.parse(calls[1].body)).toEqual({ entity_type: "task", entity_id: 7, values: { "demo.opened": 4, "demo.link": null } });
+    expect(JSON.parse(calls[4].body)).toEqual({ entity_type: "plugin", values: { synced: null } });
+    const [form] = tokenForms();
+    expect(form.get("grant_type")).toBe("client_credentials");
+    expect(form.get("resource")).toBe("urn:initiative:initiative:5");
+    expect(tokenForms()).toHaveLength(1);
+  });
+
   it("asks a member for consent on the installation's token", async () => {
     answers.set("POST /api/v1/plugin-platform/consent-requests", (request) => json(201, JSON.parse(request.body)));
     const answer = await initiative()
