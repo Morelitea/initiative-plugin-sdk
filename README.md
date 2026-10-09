@@ -232,7 +232,9 @@ What a plug-in adds to the views and pages of Initiative's items: tasks,
 calendar events, queue items, counters, gallery images and posts
 (`ITEM_KINDS`). Initiative draws all of it with its own components, so no
 plug-in code runs in a reader's browser, and the community's managers place
-it; a plug-in never places itself.
+it; a plug-in never places itself. They are a container plug-in's: a declarative
+plug-in holds no installation token to keep metadata with, and no handler to
+run an action.
 
 **Metadata** is what the plug-in keeps on an item or on its own install: values
 by key (a lowercase letter, then lowercase letters, digits, `_` and `.`), held

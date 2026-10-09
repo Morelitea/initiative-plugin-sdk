@@ -1610,17 +1610,21 @@ export interface Manifest {
    */
   dashboards?: BundledDashboard[];
   /**
-   * How the plug-in's metadata is shown on items.
+   * How the plug-in's metadata is shown on items. A container plug-in's only: a
+   * declarative plug-in holds no installation token, so it keeps no metadata to
+   * show.
    */
   fields?: Field[];
   /**
    * Pieces of items' pages and views, built from Initiative's components and
-   * bound to the plug-in's fields and actions.
+   * bound to the plug-in's fields and actions. A container plug-in's only, as
+   * fields are.
    */
   parts?: Part[];
   /**
    * What a reader may run on an item, each one of the plug-in's write
-   * endpoints.
+   * endpoints. A container plug-in's only: a declarative plug-in has no handler
+   * to do an action's work.
    */
   actions?: Action[];
 }

@@ -2328,7 +2328,7 @@
         "items": {
           "ref": "field"
         },
-        "description": "How the plug-in's metadata is shown on items."
+        "description": "How the plug-in's metadata is shown on items. A container plug-in's only: a declarative plug-in holds no installation token, so it keeps no metadata to show."
       },
       "parts": {
         "type": "array",
@@ -2336,7 +2336,7 @@
         "items": {
           "ref": "part"
         },
-        "description": "Pieces of items' pages and views, built from Initiative's components and bound to the plug-in's fields and actions."
+        "description": "Pieces of items' pages and views, built from Initiative's components and bound to the plug-in's fields and actions. A container plug-in's only, as fields are."
       },
       "actions": {
         "type": "array",
@@ -2344,7 +2344,7 @@
         "items": {
           "ref": "action"
         },
-        "description": "What a reader may run on an item, each one of the plug-in's write endpoints."
+        "description": "What a reader may run on an item, each one of the plug-in's write endpoints. A container plug-in's only: a declarative plug-in has no handler to do an action's work."
       }
     }
   }

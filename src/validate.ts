@@ -949,6 +949,9 @@ function kindProblems(body: Manifest): ValidationProblem[] {
     if (!body.hosts) push("/hosts", "a declarative plug-in (one with no service block) names the hosts it calls");
     if (body.schedules) push("/schedules", "a declarative plug-in has no schedules: they call a container's hook");
     if (body.pages) push("/pages", "a declarative plug-in has no pages: a page is served by a container");
+    if (body.fields) push("/fields", "a declarative plug-in has no fields: it holds no installation token to keep their metadata with");
+    if (body.parts) push("/parts", "a declarative plug-in has no parts: they show a container's fields and actions");
+    if (body.actions) push("/actions", "a declarative plug-in has no actions: an action's write runs a container's handler");
     endpoints.forEach((endpoint, index) => {
       const where = `/endpoints/${index}`;
       if (endpoint.direction === "emit") {

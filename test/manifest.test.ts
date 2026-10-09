@@ -1419,12 +1419,18 @@ describe("declarative plug-ins", () => {
     manifest.connections![0].flow!.after_connect = true;
     manifest.connections![1].flow!.revoke = "hook";
     manifest.schedules = [{ id: "sweep", every: "15m" }];
+    manifest.fields = [{ key: "demo.link", name: { en: "Demo" }, kind: "link", on: ["task"] }];
+    manifest.parts = [{ id: "demo", name: { en: "Demo" }, on: ["task"], tree: { type: "field", props: { field: "demo.link" } } }];
+    manifest.actions = [{ id: "label", name: { en: "Label" }, endpoint: "plugin.acme.issues.label", on: ["task"] }];
     const text = problems(manifest);
     expect(text).toContain("/hosts: a declarative plug-in (one with no service block) names the hosts it calls");
     expect(text).toContain("/endpoints/0: a declarative endpoint gives exactly one of 'request' and 'steps'");
     expect(text).toContain("/connections/0/flow/after_connect: a declarative plug-in gives after_connect's request and map");
     expect(text).toContain("/connections/1/flow/revoke: a declarative plug-in has no revoke hook");
     expect(text).toContain("/schedules: a declarative plug-in has no schedules");
+    expect(text).toContain("/fields: a declarative plug-in has no fields");
+    expect(text).toContain("/parts: a declarative plug-in has no parts");
+    expect(text).toContain("/actions: a declarative plug-in has no actions");
   });
 
   it("checks what requests and steps name", () => {
