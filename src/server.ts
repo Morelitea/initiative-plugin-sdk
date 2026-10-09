@@ -395,8 +395,8 @@ function builtManifest(plugin: AnyPlugin, given: Manifest | undefined): Manifest
     if (Object.keys(plugin.widgets ?? {}).length) throw new Error("no manifest.json: run initiative-plugin build");
     return manifestOf(plugin);
   }
-  const modules = Object.fromEntries((built.widgets ?? []).map((widget) => [widget.id, widget.module_source]));
-  if (JSON.stringify(manifestOf(plugin, modules)) !== JSON.stringify(built)) {
+  const templates = Object.fromEntries((built.widgets ?? []).map((widget) => [widget.id, widget.template]));
+  if (JSON.stringify(manifestOf(plugin, templates)) !== JSON.stringify(built)) {
     throw new Error("manifest.json does not match the plug-in's definition: run initiative-plugin build");
   }
   return built;

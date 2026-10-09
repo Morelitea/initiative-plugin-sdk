@@ -13,14 +13,14 @@ holds its tokens, and builds its manifest.
 | `initiative-plugin-sdk/manifest` | `definePlugin`, `defineEndpoint`, the contract's types, `validateManifest`, `pluginApiCompatible` |
 | `initiative-plugin-sdk/server` | `createPlugin`, `serve`, `EndpointError` |
 | `initiative-plugin-sdk/client` | `Initiative` and the `Client` it gives, acting as the community or a member; plug-in keys |
-| `initiative-plugin-sdk/widget` | What a widget is handed, and the scenes it returns |
 | `initiative-plugin-sdk/testing` | A declarative plug-in's requests and maps, run against recorded vendor answers |
 | `initiative-plugin-sdk/plugin-api.json` | The plug-in API contract: the OpenAPI document of every route a plug-in may call |
 | bin `initiative-plugin` | `init`, `build`, `pack`, `dev`, `validate`, `keygen`, `uid`, `schema` |
 
 Node 20 or later. Two runtime dependencies, `ajv` and `jsonata`; everything
-cryptographic uses `node:crypto`. `initiative-plugin build` bundles widgets with
-[esbuild](https://esbuild.github.io/), which you install beside the SDK:
+cryptographic uses `node:crypto`. `initiative-plugin build` loads a TypeScript
+definition with [esbuild](https://esbuild.github.io/), which you install beside
+the SDK:
 
 ```sh
 npm install initiative-plugin-sdk
@@ -59,9 +59,10 @@ export default definePlugin({
   widgets: {
     "open-count": {
       meta: { name: { en: "Open tickets" } },
-      endpoints: ["open-tickets"],
-      module: "src/widgets/open-count.ts",
-      sample_data: { "open-tickets": { total: 12 } },
+      endpoint: "open-tickets",
+      template: "src/widgets/open-count.html",
+      strings: { open: { en: "Open", de: "Offen" } },
+      sample_data: { total: 12 },
     },
   },
 });
@@ -222,25 +223,38 @@ it is the deployment's decision.
 
 ## 2. Widgets
 
-A widget is a module exporting `render`, typed from the endpoint it draws:
+A widget is one of the plug-in's read endpoints, drawn by a template. The
+endpoint's `map` shapes the data on Initiative's side, and the template lays it
+out. No widget code runs anywhere.
 
-```ts
-// src/widgets/open-count.ts
-import type { Scene, WidgetData } from "initiative-plugin-sdk/widget";
-import type { openTickets } from "../plugin.js";
-
-export function render(data: WidgetData<typeof openTickets>): Scene {
-  return { v: 1, scene: { kind: "metric", value: data.values.total ?? 0, label: "Open" } };
-}
+```html
+<!-- src/widgets/open-count.html -->
+<metric :value="values.total" :label="strings.open" />
 ```
 
-`data.rows` holds one entry per index across the endpoint's `list` returns,
-and `data.values` its single-valued returns. `render` also receives the tile's
-options and `{ locale, slots }`.
+A template is HTML whose directives and bindings are
+[CEL](https://cel.dev) expressions:
+- `if`, `else-if` and `else` on an element choose between siblings;
+- `for="item in rows"` repeats one;
+- `:attribute="expression"` binds an attribute;
+- `{{ expression }}` puts a value in the text.
 
-The build bundles each widget, with everything it imports, into the one script
-Initiative runs in a sandbox with no network, DOM or timers, and checks the
-contract's size cap. A widget imports nothing at run time.
+It reads:
+- `rows`: one entry per index across the endpoint's `list` returns;
+- `values`: its single-valued returns;
+- `strings`: the widget's own words, each in the reader's language;
+- `now`: the minute it is drawn.
+
+Besides structure and text it may place the widget elements Initiative draws:
+`metric`, `chart`, `timeline`, `funnel`, `progress`, `heatmap`, `data-table`
+and `board`, each given its props as bindings (`:series="…"`).
+
+The elements, attributes, element props, functions, classes and limits a
+template may use are the contract's `templates` block (`TEMPLATES`, with the
+limits in `CAPS`). `build` checks a template's size, elements and classes against
+it. Initiative compiles the whole template, checking every field it reads
+against the endpoint's `returns`, when the plug-in is published, and refuses one
+that does not compile.
 
 ## 3. Build
 
@@ -249,8 +263,8 @@ npx initiative-plugin build              # writes manifest.json
 npx initiative-plugin build --check      # CI: fails if manifest.json is stale
 ```
 
-`build` reads `src/plugin.ts` (`--plugin <file>` for another), bundles the widgets,
-checks the result with `validateManifest`, and writes `manifest.json`. Commit
+`build` reads `src/plugin.ts` (`--plugin <file>` for another), reads each widget's
+template, checks the result with `validateManifest`, and writes `manifest.json`. Commit
 it and ship it with the plug-in: the server serves it, and refuses to start if it
 no longer matches the definition.
 

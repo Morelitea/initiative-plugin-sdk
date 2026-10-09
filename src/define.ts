@@ -273,17 +273,20 @@ export type WebhooksDeclaration<E> = Omit<Webhooks, "events"> & {
 
 type ReturnsOf<X> = X extends { returns?: infer R } ? NonNullable<R> : {};
 
-/** A dashboard tile the plug-in contributes. `module` is the widget's source file. */
-export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "module_source" | "endpoints" | "sample_data"> {
-  /** Read endpoints the widget may be bound to. */
-  endpoints?: readonly ReadName<E>[];
+/**
+ * A dashboard tile the plug-in contributes: one of its read endpoints, drawn by
+ * a template. The endpoint's `map` shapes the data; the template lays it out.
+ */
+export interface WidgetDeclaration<E> extends Omit<Widget, "id" | "endpoint" | "template" | "sample_data"> {
+  /** The read endpoint the widget draws. */
+  endpoint: ReadName<E>;
   /**
-   * The widget's TypeScript module, relative to the plug-in's package: it exports
-   * `render(data)`. The build bundles it into the manifest's `module_source`.
+   * The widget's template, an `.html` file relative to the plug-in's package.
+   * The build puts its text in the manifest's `template`.
    */
-  module: string;
-  /** What each endpoint would answer, for a preview with no network call. */
-  sample_data?: { [K in ReadName<E>]?: Result<ReturnsOf<E[K]>> };
+  template: string;
+  /** What the endpoint would answer, for a preview with no network call. */
+  sample_data?: { [K in ReadName<E>]: Result<ReturnsOf<E[K]>> }[ReadName<E>];
 }
 
 export interface DashboardDeclaration<E, W> extends Omit<BundledDashboard, "widgets"> {
@@ -392,11 +395,11 @@ export function endpointId(plugin: { publicId: string }, name: string): string {
 
 /**
  * The manifest a definition declares: its handlers left out, its keys made
- * ids, in the contract's order. Each widget's `module_source` is taken from
- * `modules` by widget id. A definition naming `hosts` is declarative, and its
+ * ids, in the contract's order. Each widget's `template` is its text, taken
+ * from `templates` by widget id. A definition naming `hosts` is declarative, and its
  * manifest has no `service` block.
  */
-export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = {}): Manifest {
+export function manifestOf(plugin: AnyPlugin, templates: Record<string, string> = {}): Manifest {
   const id = (name: string) => endpointId(plugin, name);
   const blocks: Partial<Manifest> = {
     vendor: plugin.vendor,
@@ -408,7 +411,7 @@ export function manifestOf(plugin: AnyPlugin, modules: Record<string, string> = 
     schedules: listOf(plugin.schedules, (key, schedule) => ({ id: key, every: schedule.every })),
     endpoints: listOf(plugin.endpoints, (key, endpoint) => endpointOf(id(key), endpoint, id)),
     community_summary: plugin.communitySummary === undefined ? undefined : id(plugin.communitySummary),
-    widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, modules[key] ?? "", id)),
+    widgets: listOf(plugin.widgets, (key, widget) => widgetOf(key, widget, templates[key] ?? "", id)),
     pages: listOf(plugin.pages, (key, page) => {
       const { handler: _handler, ...declared } = page;
       return { id: key, ...declared };
@@ -468,16 +471,14 @@ function endpointOf(endpointIdValue: string, endpoint: EndpointDeclaration, id: 
 function widgetOf(
   key: string,
   widget: WidgetDeclaration<any>,
-  source: string,
+  template: string,
   id: (name: string) => string
 ): Widget {
   const out: Record<string, unknown> = { id: key };
   for (const [field, value] of Object.entries(widget)) {
-    if (field === "module") out.module_source = source;
-    else if (field === "endpoints") out.endpoints = (value as string[]).map(id);
-    else if (field === "sample_data") {
-      out.sample_data = Object.fromEntries(Object.entries(value as object).map(([name, sample]) => [id(name), sample]));
-    } else out[field] = value;
+    if (field === "template") out.template = template;
+    else if (field === "endpoint") out.endpoint = id(value as string);
+    else out[field] = value;
   }
   return out as unknown as Widget;
 }

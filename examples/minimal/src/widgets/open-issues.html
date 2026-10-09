@@ -1,0 +1,8 @@
+<!-- A project's open issues, with the closed ones beneath. -->
+<metric
+  if="has(values.opened) && values.opened != null"
+  :value="values.opened"
+  :label="strings.open"
+  :caption="has(values.closed) && values.closed != null ? string(values.closed) + ' ' + strings.closed : ''"
+/>
+<p else class="text-sm text-muted-foreground">{{ strings.none }}</p>

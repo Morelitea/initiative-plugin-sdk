@@ -1,8 +1,8 @@
 /**
  * `initiative-plugin build`: the files a plug-in's definition produces.
  *
- * - `manifest.json`: the manifest, with each widget's module bundled into its
- *   `module_source`, after `validateManifest` has passed it. That parses
+ * - `manifest.json`: the manifest, with each widget's template file read into
+ *   its `template`, after `validateManifest` has passed it. That parses
  *   every JSONata expression a declarative plug-in gives, so one that does not
  *   parse fails the build at its place in the manifest.
  * - With `--registry <dir>`, the plug-in's registry source under
@@ -21,8 +21,8 @@
  * registry source is written from its listing, which states the version it
  * lists; no `manifest.json` is written beside it.
  *
- * Bundling uses esbuild, which the plug-in installs beside the SDK
- * (`npm install --save-dev esbuild`). Nothing at run time needs it.
+ * Loading a TypeScript definition uses esbuild, which the plug-in installs
+ * beside the SDK (`npm install --save-dev esbuild`). Nothing at run time needs it.
  */
 
 import { createHash } from "node:crypto";
@@ -30,7 +30,6 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { CAPS } from "./contract.js";
 import { manifestOf, type AnyPlugin, type ListingDeclaration } from "./define.js";
 import type { Manifest } from "./contract.js";
 import { validateManifest } from "./validate.js";
@@ -109,22 +108,21 @@ function compileBuilt(root: string, file: string): Compiled {
 }
 
 /**
- * Load the plug-in's definition, bundle its widgets and check the manifest they
- * make, with nothing written.
+ * Load the plug-in's definition, read its widgets' templates and check the
+ * manifest they make, with nothing written.
  */
 export async function compile(esbuild: Esbuild, root: string, entry: string): Promise<Compiled> {
   const plugin = await loadPlugin(esbuild, root, entry);
-  const modules: Record<string, string> = {};
+  const templates: Record<string, string> = {};
   const problems: string[] = [];
   for (const [id, widget] of Object.entries(plugin.widgets ?? {})) {
-    const source = await bundleWidget(esbuild, root, widget.module);
-    const bytes = Buffer.byteLength(source, "utf-8");
-    if (bytes > CAPS.moduleSourceBytes) {
-      problems.push(`widget ${id}: ${widget.module} bundles to ${bytes} bytes, over the ${CAPS.moduleSourceBytes}-byte cap`);
+    try {
+      templates[id] = readFileSync(resolve(root, widget.template), "utf-8");
+    } catch {
+      problems.push(`widget ${id}: there is no template at ${widget.template}`);
     }
-    modules[id] = source;
   }
-  return checked(plugin, manifestOf(plugin, modules), problems);
+  return checked(plugin, manifestOf(plugin, templates), problems);
 }
 
 /** The plug-in and its manifest, or every problem with them beside `problems`. */
@@ -214,31 +212,6 @@ async function loadPlugin(esbuild: Esbuild, root: string, entry: string): Promis
   } finally {
     rmSync(outfile, { force: true });
   }
-}
-
-/**
- * One widget as the single script the sandbox runs: its module and everything
- * it imports, with `render` left as a global.
- */
-async function bundleWidget(esbuild: Esbuild, root: string, module: string): Promise<string> {
-  const path = `./${relative(root, resolve(root, module)).split("\\").join("/")}`;
-  const result = await esbuild.build({
-    stdin: {
-      contents: `import { render } from ${JSON.stringify(path)};\nglobalThis.render = render;\n`,
-      resolveDir: root,
-      sourcefile: "widget.js",
-      loader: "js",
-    },
-    bundle: true,
-    write: false,
-    format: "iife",
-    platform: "neutral",
-    target: "es2020",
-    charset: "utf8",
-    legalComments: "none",
-    logLevel: "error",
-  });
-  return result.outputFiles[0].text.trimEnd();
 }
 
 /**

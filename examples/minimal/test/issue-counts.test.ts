@@ -1,13 +1,13 @@
 /**
  * The endpoint's request and map, run against a recorded GitLab answer as
- * Initiative runs them, and the widget drawing what it answers.
+ * Initiative runs them. The widget's template draws what the endpoint answers;
+ * Initiative compiles and checks it when the plug-in is published.
  */
 
 import { describe, expect, it } from "vitest";
 import { runEndpoint } from "initiative-plugin-sdk/testing";
 
 import plugin from "../src/plugin.js";
-import { render } from "../src/widgets/open-issues.js";
 import statistics from "./fixtures/issues-statistics.json" with { type: "json" };
 
 describe("issue-counts", () => {
@@ -35,14 +35,5 @@ describe("issue-counts", () => {
       responses: [{ status: 404, body: { message: "404 Project Not Found" } }],
     });
     expect(run).toMatchObject({ unavailable: "not-found" });
-  });
-});
-
-describe("the open-issues widget", () => {
-  it("draws the open count", () => {
-    expect(render({ source: "plugin", rows: [], values: { opened: 12, closed: 30 } })).toEqual({
-      v: 1,
-      scene: { kind: "metric", value: 12, label: "Open issues", caption: "30 closed" },
-    });
   });
 });

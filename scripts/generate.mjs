@@ -3,8 +3,8 @@
  * Generate everything derived from `manifest.contract.json`.
  *
  * The contract is the one hand-authored statement of what a plug-in manifest may
- * say: the vocabulary (enums, ladders, caps, character sets) and the shape (each
- * object's fields). Two things are generated from it and committed beside it:
+ * say: the vocabulary (enums, ladders, caps, character sets), the shape (each
+ * object's fields), and what a template inside it may contain (`templates`). Two things are generated from it and committed beside it:
  *
  * - `schemas/plugin-manifest.json` — the JSON Schema an author validates against.
  * - `src/contract.ts` — the same vocabulary and every object's shape as
@@ -32,7 +32,7 @@ import { emitter, literal, pascal } from "./ts-emit.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(readFileSync(join(root, "manifest.contract.json"), "utf-8"));
-const { charsets, enums, ladders, caps, defs, manifest } = contract;
+const { charsets, enums, ladders, caps, templates, defs, manifest } = contract;
 
 /** Numbers reach the schema by the name the contract gives them. */
 function resolveCap(value) {
@@ -182,6 +182,13 @@ function buildTypes() {
   );
   for (const [name, value] of Object.entries(caps)) lines.push(`  ${name}: ${value},`);
   lines.push("} as const;", "");
+
+  const { $comment: templatesNote, ...vocabulary } = templates;
+  lines.push(
+    ...doc(templatesNote, ""),
+    `export const TEMPLATES = ${JSON.stringify(vocabulary, null, 2)} as const;`,
+    ""
+  );
 
   lines.push(
     "/** The character sets ids and paths are drawn from. */",

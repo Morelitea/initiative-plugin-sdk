@@ -62,9 +62,14 @@ export default definePlugin({
   widgets: {
     "open-issues": {
       meta: { name: { en: "Open issues" } },
-      endpoints: ["issue-counts"],
-      module: "src/widgets/open-issues.ts",
-      sample_data: { "issue-counts": { opened: 12, closed: 30 } },
+      endpoint: "issue-counts",
+      template: "src/widgets/open-issues.html",
+      strings: {
+        open: { en: "Open issues" },
+        closed: { en: "closed" },
+        none: { en: "No counts yet" },
+      },
+      sample_data: { opened: 12, closed: 30 },
     },
   },
 

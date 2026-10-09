@@ -11,7 +11,7 @@ import { definePlugin, defineEndpoint, validateManifest } from "../src/manifest.
 import { issuesPlugin, trackerPlugin } from "./support/plugin.js";
 
 const { plugin } = trackerPlugin();
-const manifest = manifestOf(plugin, { "open-count": "globalThis.render = function () {};" });
+const manifest = manifestOf(plugin, { "open-count": '<metric :value="values.total" :label="strings.open" />' });
 
 describe("manifestOf", () => {
   it("writes the contract's manifest, in its order, with every key made an id", () => {
@@ -92,9 +92,10 @@ describe("manifestOf", () => {
             {
               id: "open-count",
               meta: { name: { en: "Open tickets" } },
-              endpoints: ["plugin.acme.tracker.open-tickets"],
-              module_source: "globalThis.render = function () {};",
-              sample_data: { "plugin.acme.tracker.open-tickets": { total: 3 } },
+              endpoint: "plugin.acme.tracker.open-tickets",
+              template: '<metric :value="values.total" :label="strings.open" />',
+              strings: { open: { en: "Open tickets" } },
+              sample_data: { total: 3 },
             },
           ],
           pages: [{ id: "board", path: "/board", name: { en: "Board" }, scopes: ["initiative"] }],
@@ -254,11 +255,11 @@ describe("the definition's types", () => {
     const read = defineEndpoint({ direction: "read", returns: { total: "int" }, handler: async () => ({ result: {} }) });
     const write = defineEndpoint({ direction: "write", handler: async () => ({ result: {} }) });
     const name = { publicId: "acme.x", uid: "K7M2QX8N4TVB9E", name: "X" };
-    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, module: "w.ts", endpoints: ["read"] } } });
+    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, template: "w.html", endpoint: "read" } } });
     // @ts-expect-error not declared
-    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, module: "w.ts", endpoints: ["missing"] } } });
+    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, template: "w.html", endpoint: "missing" } } });
     // @ts-expect-error a write draws nothing
-    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, module: "w.ts", endpoints: ["write"] } } });
+    definePlugin({ ...name, endpoints: { read, write }, widgets: { w: { meta: {}, template: "w.html", endpoint: "write" } } });
     // @ts-expect-error a summary is a read
     definePlugin({ ...name, endpoints: { read, write }, communitySummary: "write" });
   });

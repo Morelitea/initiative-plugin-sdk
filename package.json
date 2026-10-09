@@ -37,10 +37,6 @@
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
     },
-    "./widget": {
-      "types": "./dist/widget.d.ts",
-      "default": "./dist/widget.js"
-    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"

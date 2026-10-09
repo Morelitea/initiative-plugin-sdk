@@ -107,9 +107,10 @@ export function trackerPlugin() {
     widgets: {
       "open-count": {
         meta: { name: { en: "Open tickets" } },
-        endpoints: ["open-tickets"],
-        module: "widgets/open-count.ts",
-        sample_data: { "open-tickets": { total: 3 } },
+        endpoint: "open-tickets",
+        template: "widgets/open-count.html",
+        strings: { open: { en: "Open tickets" } },
+        sample_data: { total: 3 },
       },
     },
     pages: {

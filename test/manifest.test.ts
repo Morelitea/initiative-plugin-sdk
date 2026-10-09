@@ -177,11 +177,11 @@ describe("features cross-check", () => {
 });
 
 describe("references", () => {
-  const widget = (endpoints: string[]) => ({
+  const widget = (endpoint: string) => ({
     id: "w",
     meta: { name: { en: "W" } },
-    module_source: "x",
-    endpoints,
+    template: "<p>x</p>",
+    endpoint,
   });
 
   it("catches a widget binding an endpoint that does not exist", () => {
@@ -189,7 +189,7 @@ describe("references", () => {
       ...base(),
       features: ["widgets", "endpoints"],
       endpoints: [{ id: "plugin.acme.tracker.known", direction: "read" }],
-      widgets: [widget(["plugin.acme.tracker.absent"])],
+      widgets: [widget("plugin.acme.tracker.absent")],
     });
     expect(problems).toHaveLength(1);
     expect(problems[0].message).toContain("not a declared read endpoint");
@@ -204,7 +204,7 @@ describe("references", () => {
         ...base(),
         features: ["widgets", "endpoints"],
         endpoints: [{ id: "plugin.acme.tracker.act", direction }],
-        widgets: [widget(["plugin.acme.tracker.act"])],
+        widgets: [widget("plugin.acme.tracker.act")],
       });
       expect(problems).toHaveLength(1);
       expect(problems[0].message).toContain("not a declared read endpoint");
@@ -274,7 +274,7 @@ describe("references", () => {
           { id: "plugin.acme.tracker.issue-open", direction: "write", actors: ["member"] },
           { id: "plugin.acme.tracker.issue-opened", direction: "emit" },
         ],
-        widgets: [widget(["plugin.acme.tracker.issues"])],
+        widgets: [widget("plugin.acme.tracker.issues")],
       })
     ).toEqual([]);
   });
@@ -1010,9 +1010,9 @@ describe("terms the contract does not declare", () => {
             {
               id: "tile",
               meta: { name: { en: "Tile" }, anything: 1 },
-              module_source: "x",
-              endpoints: ["plugin.acme.tracker.read"],
-              sample_data: { "plugin.acme.tracker.read": { n: 1 } },
+              template: "<p>x</p>",
+              endpoint: "plugin.acme.tracker.read",
+              sample_data: { n: 1 },
             },
           ],
         } as never)

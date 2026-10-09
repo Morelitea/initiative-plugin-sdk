@@ -1,5 +1,5 @@
 /**
- * `initiative-plugin build`: the manifest with each widget bundled into it, and
+ * `initiative-plugin build`: the manifest with each widget's template in it, and
  * the registry source while the listing names the package's version, or a
  * check that the committed files are what the definition produces. `pack`,
  * the listing file a deployment publishes as its own plug-in, and `dev`, which
@@ -13,7 +13,6 @@ import type { AddressInfo } from "node:net";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { build } from "../src/build.js";
@@ -43,7 +42,7 @@ export default definePlugin({
   uid: "K7M2QX8N4TVB9C",
   name: "Tracker",
   endpoints: { count },
-  widgets: { total: { meta: { name: { en: "Total" } }, endpoints: ["count"], module: "widgets/total.ts" } },
+  widgets: { total: { meta: { name: { en: "Total" } }, endpoint: "count", template: "widgets/total.html" } },
   listing: {
     publisher: "acme",
     summary: "Tickets.",
@@ -90,13 +89,7 @@ export default definePlugin({
 `;
 }
 
-const WIDGET = `
-import { label } from "./words.js";
-
-export function render(data: { values: { total?: number } }) {
-  return { v: 1, scene: { kind: "metric" as const, value: data.values.total ?? 0, label } };
-}
-`;
+const WIDGET = `<metric :value="values.total" label="Open" />\n`;
 
 function write(files: Record<string, string | Buffer>): void {
   for (const [path, content] of Object.entries(files)) {
@@ -123,8 +116,7 @@ beforeEach(() => {
   write({
     "package.json": JSON.stringify({ name: "tracker", version: "1.2.0" }),
     "src/plugin.ts": plugin(),
-    "widgets/total.ts": WIDGET,
-    "widgets/words.ts": 'export const label = "Open";\n',
+    "widgets/total.html": WIDGET,
     "assets/avatar.png": avatar,
   });
 });
@@ -137,23 +129,21 @@ afterEach(() => {
 const manifest = () => JSON.parse(readFileSync(join(root, "manifest.json"), "utf-8"));
 
 describe("build", () => {
-  it("writes the manifest with each widget bundled into one script that leaves render as a global", async () => {
+  it("writes the manifest with each widget's template in it", async () => {
     expect(await run()).toBe(0);
     const [widget] = manifest().widgets;
-    expect(widget).toMatchObject({ id: "total", endpoints: ["plugin.acme.tracker.count"] });
-    expect(widget.module_source).not.toMatch(/\bimport\b|\bexport\b/);
-    const sandbox: Record<string, unknown> = {};
-    runInNewContext(widget.module_source, sandbox);
-    expect((sandbox.render as (data: unknown) => unknown)({ values: { total: 4 } })).toEqual({
-      v: 1,
-      scene: { kind: "metric", value: 4, label: "Open" },
+    expect(widget).toEqual({
+      id: "total",
+      meta: { name: { en: "Total" } },
+      endpoint: "plugin.acme.tracker.count",
+      template: WIDGET,
     });
   });
 
   it("checks the committed files, and fails once a widget changes without a build", async () => {
     await run();
     expect(await run({ check: true })).toBe(0);
-    write({ "widgets/words.ts": 'export const label = "Still open";\n' });
+    write({ "widgets/total.html": WIDGET.replace("Open", "Still open") });
     expect(await run({ check: true })).toBe(1);
     expect(errors.join("")).toContain("manifest.json is out of date");
   });
@@ -165,10 +155,22 @@ describe("build", () => {
     expect(existsSync(join(root, "manifest.json"))).toBe(false);
   });
 
-  it("refuses a widget over the size cap", async () => {
-    write({ "widgets/words.ts": `export const label = "${"x".repeat(70_000)}";\n` });
+  it("refuses a template over the size cap, or naming what a template may not use", async () => {
+    write({ "widgets/total.html": `<p>${"x".repeat(17_000)}</p>` });
     expect(await run()).toBe(1);
-    expect(errors.join("")).toContain("over the 65536-byte cap");
+    expect(errors.join("")).toContain("over the 16384-byte cap");
+
+    write({ "widgets/total.html": '<script>alert(1)</script><p class="text-sm bg-red-500">x</p>' });
+    expect(await run()).toBe(1);
+    expect(errors.join("")).toContain("uses <script>, which a template may not");
+    expect(errors.join("")).toContain("uses the class 'bg-red-500'");
+    expect(errors.join("")).not.toContain("'text-sm'");
+  });
+
+  it("names a template file that is not there", async () => {
+    write({ "src/plugin.ts": plugin().replace("widgets/total.html", "widgets/gone.html") });
+    expect(await run()).toBe(1);
+    expect(errors.join("")).toContain("widget total: there is no template at widgets/gone.html");
   });
 });
 

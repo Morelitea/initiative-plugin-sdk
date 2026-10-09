@@ -35,6 +35,7 @@ import {
   type Feature,
   type Manifest,
   type Requires,
+  TEMPLATES,
   type VendorRequest,
 } from "./contract.js";
 import { ExpressionError, parseExpression } from "./expression.js";
@@ -632,17 +633,16 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
   );
   (body.widgets ?? []).forEach((widget, index) => {
     checkRequires(widget.requires, `/widgets/${index}/requires`);
-    for (const id of widget.endpoints ?? []) {
-      // The restriction is the widget's, not the endpoint's: a widget draws
-      // what it is given, so it can only bind one that answers. An automation
-      // reaching the same endpoint is under no such rule.
-      if (!readable.has(id)) {
-        problems.push({
-          where: `/widgets/${index}/endpoints`,
-          message: `binds '${id}', which is not a declared read endpoint`,
-        });
-      }
+    // The restriction is the widget's, not the endpoint's: a widget draws what
+    // it is given, so it can only bind one that answers. An automation reaching
+    // the same endpoint is under no such rule.
+    if (!readable.has(widget.endpoint)) {
+      problems.push({
+        where: `/widgets/${index}/endpoint`,
+        message: `binds '${widget.endpoint}', which is not a declared read endpoint`,
+      });
     }
+    problems.push(...templateProblems(widget.template, `/widgets/${index}/template`));
   });
 
   return problems;
@@ -848,6 +848,42 @@ function scheduleProblems(body: Manifest): ValidationProblem[] {
 }
 
 /** An interval, a schedule's or a health check's, within the schedule bounds. */
+const TEMPLATE_ELEMENTS = new Set<string>([
+  ...Object.keys(TEMPLATES.elements),
+  ...Object.keys(TEMPLATES.widgetElements),
+]);
+const TEMPLATE_CLASSES = new Set<string>(TEMPLATES.classes);
+
+/**
+ * A template's size, and the element and class names it uses, against the
+ * contract. Initiative compiles the whole template when the plug-in is
+ * published; this catches a misspelt element, or a class Initiative does not
+ * style for plug-ins, before then.
+ */
+function templateProblems(template: string, where: string): ValidationProblem[] {
+  const problems: ValidationProblem[] = [];
+  const bytes = new TextEncoder().encode(template).length;
+  if (bytes > CAPS.templateBytes) {
+    problems.push({ where, message: `is ${bytes} bytes, over the ${CAPS.templateBytes}-byte cap` });
+  }
+  const elements = new Set<string>();
+  for (const [, name] of template.matchAll(/<([a-z][a-z0-9-]*)/g)) elements.add(name as string);
+  for (const name of elements) {
+    if (!TEMPLATE_ELEMENTS.has(name)) problems.push({ where, message: `uses <${name}>, which a template may not` });
+  }
+  // `class="…"`, not a bound `:class`, whose classes are only known when it draws.
+  const classes = new Set<string>();
+  for (const [, list] of template.matchAll(/(?:^|[\s<])class="([^"]*)"/g)) {
+    for (const name of (list as string).split(/\s+/)) if (name) classes.add(name);
+  }
+  for (const name of classes) {
+    if (!TEMPLATE_CLASSES.has(name)) {
+      problems.push({ where, message: `uses the class '${name}', which Initiative does not style for plug-ins` });
+    }
+  }
+  return problems;
+}
+
 function intervalProblems(every: string, where: string): ValidationProblem[] {
   const count = Number(every.slice(0, -1));
   const minutes = every.endsWith("h") ? count * 60 : count;

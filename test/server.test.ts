@@ -21,7 +21,7 @@ const BASE = "https://initiative.example.com/api/v1";
 const platform = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
 const stranger = generatePluginKeys({ alg: "RS256", kid: "platform-1" });
 const pluginKeys = generatePluginKeys({ alg: "ES256", kid: "plugin-1" });
-const MODULES = { "open-count": "globalThis.render = function () {};" };
+const TEMPLATES = { "open-count": '<metric :value="values.total" :label="strings.open" />' };
 
 function sign(
   claims: Record<string, unknown>,
@@ -63,7 +63,7 @@ function start(options: Record<string, unknown> = {}): PluginHandler {
   return createPlugin(tracker.plugin, {
     baseUrl: BASE,
     key: { privateKey: pluginKeys.privateKeyPem, kid: "plugin-1" },
-    manifest: manifestOf(tracker.plugin, MODULES),
+    manifest: manifestOf(tracker.plugin, TEMPLATES),
     fetch: outbound,
     log: { info: () => {}, warn: () => {}, error: (message) => logs.push(message) },
     env: {},
@@ -118,7 +118,7 @@ describe("what the plug-in publishes", () => {
       kind: "plugin",
       uid: "K7M2QX8N4TVB9C",
       name: "Tracker",
-      definition: manifestOf(tracker.plugin, MODULES),
+      definition: manifestOf(tracker.plugin, TEMPLATES),
     });
   });
 
@@ -318,7 +318,7 @@ describe("starting", () => {
   });
 
   it("refuses a built manifest the definition no longer matches", () => {
-    const stale = manifestOf(trackerPlugin().plugin, MODULES);
+    const stale = manifestOf(trackerPlugin().plugin, TEMPLATES);
     stale.endpoints = stale.endpoints!.slice(1);
     expect(() => start({ manifest: stale })).toThrow(/run initiative-plugin build/);
   });
