@@ -41,6 +41,18 @@
       "types": "./dist/widget.d.ts",
       "default": "./dist/widget.js"
     },
+    "./parts": {
+      "types": "./dist/parts.d.ts",
+      "default": "./dist/parts.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "default": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-dev-runtime.d.ts",
+      "default": "./dist/jsx-dev-runtime.js"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
