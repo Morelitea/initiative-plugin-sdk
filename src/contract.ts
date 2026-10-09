@@ -344,9 +344,6 @@ export const TEMPLATES = {
     ]
   },
   "blockElements": {
-    "timer": [
-      "since"
-    ],
     "copy": [
       "value"
     ],

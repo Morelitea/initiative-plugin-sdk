@@ -439,9 +439,6 @@
       ]
     },
     "blockElements": {
-      "timer": [
-        "since"
-      ],
       "copy": [
         "value"
       ],
