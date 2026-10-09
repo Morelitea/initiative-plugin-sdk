@@ -301,8 +301,9 @@ function fits(answer: unknown, returns: Record<string, ReturnSpec> | undefined, 
  * from `responses`, and its map held to the declared returns. An expression
  * reads `connection`, the fields of the connection its request names, and
  * `connections`, the fields of each connection the endpoint's `requires` names
- * that `connections` holds, by id. The call has no actor: who may run it, and
- * on whose credential, is Initiative's to decide.
+ * that `connections` holds, by id. A block's call also reads `tasks`, the ids
+ * of the tasks it is about, and, where it names one, `viewer`. The call has no
+ * actor: who may run it, and on whose credential, is Initiative's to decide.
  */
 export async function runEndpoint(
   plugin: AnyPlugin,
@@ -310,6 +311,8 @@ export async function runEndpoint(
   call: Recorded & {
     params?: Record<string, unknown>;
     connections?: Record<string, Record<string, unknown>>;
+    tasks?: number[];
+    viewer?: string;
   }
 ): Promise<Run<Record<string, unknown>>> {
   const endpoint = plugin.endpoints?.[name];
@@ -319,7 +322,13 @@ export async function runEndpoint(
     const given = call.connections ?? {};
     const required = [...(endpoint.requires?.all_of ?? []), ...(endpoint.requires?.any_of ?? [])];
     const connections = Object.fromEntries(required.filter((id) => Object.hasOwn(given, id)).map((id) => [id, given[id]]));
-    const base = { params: call.params ?? {}, connections, now: context.now };
+    const base = {
+      params: call.params ?? {},
+      connections,
+      now: context.now,
+      ...(call.tasks ? { tasks: call.tasks } : {}),
+      ...(call.viewer ? { viewer: call.viewer } : {}),
+    };
     const steps = endpoint.steps ?? [{ name: "", request: endpoint.request! }];
     const answers: Record<string, Answer> = {};
     let read: object = base;

@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CAPS } from "../src/contract.js";
+import { defineEndpoint, definePlugin } from "../src/manifest.js";
 import { evaluate, runAfterConnect, runEndpoint, runHealth, runWebhook } from "../src/testing.js";
 import { issuesPlugin } from "./support/plugin.js";
 
@@ -33,6 +34,29 @@ describe("runEndpoint", () => {
       })),
       result: { titles: ["A", "B", "C"], total: 3 },
     });
+  });
+
+  it("hands a block's read its tasks and the person looking", async () => {
+    const timers = definePlugin({
+      publicId: "acme.timers",
+      uid: "K7M2QX8N4TVB9E",
+      name: "Timers",
+      hosts: ["api.tracker.example"],
+      endpoints: {
+        mine: defineEndpoint({
+          direction: "read",
+          label: { en: "My timers" },
+          subject: "task",
+          per_viewer: true,
+          returns: { task_id: { type: "int", list: true } },
+          request: { method: "GET", url: '"https://api.tracker.example/timers/" & viewer' },
+          map: '{"task_id": tasks[$ > 3][]}',
+        }),
+      },
+    });
+    const run = await runEndpoint(timers, "mine", { tasks: [3, 4], viewer: "uref_bob", now, responses: [{ body: {} }] });
+    expect(run.requests[0].url).toBe("https://api.tracker.example/timers/uref_bob");
+    expect(run).toMatchObject({ result: { task_id: [4] } });
   });
 
   it("refuses a range past max_pages when on_limit says so", async () => {
