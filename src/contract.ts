@@ -344,17 +344,11 @@ export const TEMPLATES = {
     ]
   },
   "blockElements": {
-    "copy": [
-      "value"
-    ],
     "button": [
       "action"
     ],
     "menu-item": [
       "action"
-    ],
-    "open": [
-      "page"
     ]
   },
   "classes": [
@@ -1171,10 +1165,9 @@ export interface Block {
    * `answer` (that task's row of the endpoint's answer, or null), `strings`,
    * `now`, `area` ('inline', 'panel' or 'menu') and `width` ('base', 'sm',
    * 'md', 'lg' or 'xl'). A `<button action>` or `<menu-item action>` names one
-   * of `actions` by its key (the id after `plugin.<public id>.`), and `<open
-   * page>` one of this manifest's pages. Compiled and checked when the plug-in
-   * is published, and refused if it does not compile. Capped at 16384 UTF-8
-   * bytes, which this schema cannot express.
+   * of `actions` by its key (the id after `plugin.<public id>.`). Compiled and
+   * checked when the plug-in is published, and refused if it does not compile.
+   * Capped at 16384 UTF-8 bytes, which this schema cannot express.
    */
   template: string;
   /**

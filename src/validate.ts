@@ -653,7 +653,6 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
     problems.push(...templateProblems(widget.template, `/widgets/${index}/template`, WIDGET_ELEMENTS));
   });
 
-  const pageIds = new Set((body.pages ?? []).map((page) => page.id));
   (body.blocks ?? []).forEach((block, index) => {
     const where = `/blocks/${index}`;
     checkRequires(block.requires, `${where}/requires`);
@@ -688,11 +687,6 @@ function referenceProblems(body: Manifest, publicId: string | undefined): Valida
     for (const [, key] of block.template.matchAll(/\baction="([^"]*)"/g)) {
       if (!actionKeys.has(key as string)) {
         problems.push({ where: `${where}/template`, message: `runs the action '${key}', which this block does not declare` });
-      }
-    }
-    for (const [, id] of block.template.matchAll(/\bpage="([^"]*)"/g)) {
-      if (!pageIds.has(id as string)) {
-        problems.push({ where: `${where}/template`, message: `opens the page '${id}', which this plug-in does not declare` });
       }
     }
   });

@@ -284,8 +284,8 @@ blocks: {
 },
 ```
 
-The template language adds `<copy :value>`, `<open page>`, `<button action>`
-and `<menu-item action>`. A template reads:
+The template language adds `<button action>` and `<menu-item action>`, which
+run one of the block's `actions`. A template reads:
 - `task`: the task it is drawn on;
 - `answer`: the row of `endpoint`'s answer whose `task_id` is that task, or null;
 - `strings`, `now`, `area` (`inline`, `panel` or `menu`) and `width` (`base`
