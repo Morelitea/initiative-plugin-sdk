@@ -844,6 +844,7 @@ either the file's version or the client is stale.
 | `initiatives:read` | The initiatives the plug-in is placed in. |
 | `initiatives:moderate` | Acting as a moderator in an initiative it is placed in: everything there, within the plug-in's other scopes. Only on a token that asks for it (`level=moderator`) and is narrowed to that initiative. |
 | `community:admin` | Acting with a community admin's standing across the community, within the plug-in's other scopes. Only on a token that asks for it (`level=community_admin`) and is not narrowed to an initiative. |
+| `demo:pitches` | Making demo pitches and links, and hearing when they're opened, on a server started in demo mode. Only for a plug-in installed in that server's operations community; it reaches no community's content. |
 | `plugins:<public id>` | Calling that plug-in's public endpoints through Initiative. One per plug-in. |
 
 Writing implies reading. Within its scopes a plug-in still sees only what is open

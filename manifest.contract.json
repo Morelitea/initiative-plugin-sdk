@@ -140,7 +140,8 @@
       "members:read",
       "initiatives:read",
       "initiatives:moderate",
-      "community:admin"
+      "community:admin",
+      "demo:pitches"
     ],
     "surfaceScope": [
       "community",
